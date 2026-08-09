@@ -15,6 +15,12 @@ const PRODUCTS_TABLE = process.env.DB_PRODUCTS_TABLE || 'productos';
 const SERVICE_TYPES_TABLE = process.env.DB_SERVICE_TYPES_TABLE || 'tipos_servicio';
 const RAW_MATERIAL_LOTS_TABLE = process.env.DB_RAW_MATERIAL_LOTS_TABLE || 'lotes_materia_prima';
 const MATURATION_CONTROL_TABLE = process.env.DB_MATURATION_CONTROL_TABLE || 'control_maduracion';
+const PRODUCTION_TABLE = process.env.DB_PRODUCTION_TABLE || 'procesos_produccion';
+const PRODUCTION_STAGE_TABLE = process.env.DB_PRODUCTION_STAGE_TABLE || 'produccion_etapas';
+const PRODUCTION_MERMA_TABLE = process.env.DB_PRODUCTION_MERMA_TABLE || 'produccion_mermas';
+const PRODUCTION_INSUMO_TABLE = process.env.DB_PRODUCTION_INSUMO_TABLE || 'produccion_insumos';
+const PRODUCTION_COLD_ROOM_TABLE =
+  process.env.DB_PRODUCTION_COLD_ROOM_TABLE || 'produccion_cuartos_frio';
 const VEHICLES_TABLE = process.env.DB_VEHICLES_TABLE || 'vehiculos';
 const VEHICLE_SERVICES_TABLE = process.env.DB_VEHICLE_SERVICES_TABLE || 'servicios_vehiculo';
 const VEHICLE_MILEAGE_REPORTS_TABLE =
@@ -23,6 +29,8 @@ const ACTIVE_STATE = 'Activo';
 const INACTIVE_STATE = 'Inactivo';
 const PENDING_STATE = 'Pendiente';
 const COMPLETE_STATE = 'Completo';
+const PRODUCTION_ACTIVE_STATE = 'En proceso';
+const PRODUCTION_FINISHED_STATE = 'Finalizado';
 const RAW_MATERIAL_PRODUCT_TYPE = 'Materia Prima';
 const normalizeNullableText = (value) => (value === undefined || value === null || value === '' ? null : value);
 
@@ -66,14 +74,71 @@ const serviceTypeQueries = {
 };
 
 const maturationLotQueries = {
-  findAll: `SELECT l.id_lote_mp, l.id_producto, p.nombre AS producto_nombre, l.id_proveedor, pr.nombre_empresa AS proveedor_nombre, l.id_entrada_origen, l.fecha_recepcion, l.cantidad_unidades, l.peso_inicial_kg, l.estado_maduracion, l.estado_registro FROM ${RAW_MATERIAL_LOTS_TABLE} l LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = l.id_producto LEFT JOIN ${PROVIDERS_TABLE} pr ON pr.id_proveedor = l.id_proveedor WHERE l.estado_registro <> '${INACTIVE_STATE}' ORDER BY l.fecha_recepcion DESC, l.id_lote_mp DESC`,
-  findById: `SELECT l.id_lote_mp, l.id_producto, p.nombre AS producto_nombre, l.id_proveedor, pr.nombre_empresa AS proveedor_nombre, l.id_entrada_origen, l.fecha_recepcion, l.cantidad_unidades, l.peso_inicial_kg, l.estado_maduracion, l.estado_registro FROM ${RAW_MATERIAL_LOTS_TABLE} l LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = l.id_producto LEFT JOIN ${PROVIDERS_TABLE} pr ON pr.id_proveedor = l.id_proveedor WHERE l.id_lote_mp = ? AND l.estado_registro <> '${INACTIVE_STATE}'`,
+  findAll: `SELECT l.id_lote_mp, l.id_producto, p.nombre AS producto_nombre, l.id_proveedor, pr.nombre_empresa AS proveedor_nombre, l.id_entrada_origen, l.fecha_recepcion, l.cantidad_unidades, l.peso_inicial_kg, l.peso_consumido_kg, l.peso_disponible_kg, l.estado_maduracion, l.estado_registro FROM ${RAW_MATERIAL_LOTS_TABLE} l LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = l.id_producto LEFT JOIN ${PROVIDERS_TABLE} pr ON pr.id_proveedor = l.id_proveedor WHERE l.estado_registro <> '${INACTIVE_STATE}' ORDER BY l.fecha_recepcion DESC, l.id_lote_mp DESC`,
+  findById: `SELECT l.id_lote_mp, l.id_producto, p.nombre AS producto_nombre, l.id_proveedor, pr.nombre_empresa AS proveedor_nombre, l.id_entrada_origen, l.fecha_recepcion, l.cantidad_unidades, l.peso_inicial_kg, l.peso_consumido_kg, l.peso_disponible_kg, l.estado_maduracion, l.estado_registro FROM ${RAW_MATERIAL_LOTS_TABLE} l LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = l.id_producto LEFT JOIN ${PROVIDERS_TABLE} pr ON pr.id_proveedor = l.id_proveedor WHERE l.id_lote_mp = ? AND l.estado_registro <> '${INACTIVE_STATE}'`,
 };
 
 const maturationControlQueries = {
   findAll: `SELECT c.id_control, c.id_lote_mp, c.fecha_medicion, c.grados_brix, c.temperatura_cuarto, c.observaciones, l.id_producto, p.nombre AS producto_nombre, l.id_proveedor, pr.nombre_empresa AS proveedor_nombre, l.estado_maduracion, l.estado_registro FROM ${MATURATION_CONTROL_TABLE} c LEFT JOIN ${RAW_MATERIAL_LOTS_TABLE} l ON l.id_lote_mp = c.id_lote_mp LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = l.id_producto LEFT JOIN ${PROVIDERS_TABLE} pr ON pr.id_proveedor = l.id_proveedor WHERE l.estado_registro <> '${INACTIVE_STATE}' ORDER BY c.fecha_medicion DESC, c.id_control DESC`,
   findById: `SELECT c.id_control, c.id_lote_mp, c.fecha_medicion, c.grados_brix, c.temperatura_cuarto, c.observaciones, l.id_producto, p.nombre AS producto_nombre, l.id_proveedor, pr.nombre_empresa AS proveedor_nombre, l.estado_maduracion, l.estado_registro FROM ${MATURATION_CONTROL_TABLE} c LEFT JOIN ${RAW_MATERIAL_LOTS_TABLE} l ON l.id_lote_mp = c.id_lote_mp LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = l.id_producto LEFT JOIN ${PROVIDERS_TABLE} pr ON pr.id_proveedor = l.id_proveedor WHERE c.id_control = ?`,
   findByLot: `SELECT c.id_control, c.id_lote_mp, c.fecha_medicion, c.grados_brix, c.temperatura_cuarto, c.observaciones, l.id_producto, p.nombre AS producto_nombre, l.id_proveedor, pr.nombre_empresa AS proveedor_nombre, l.estado_maduracion, l.estado_registro FROM ${MATURATION_CONTROL_TABLE} c LEFT JOIN ${RAW_MATERIAL_LOTS_TABLE} l ON l.id_lote_mp = c.id_lote_mp LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = l.id_producto LEFT JOIN ${PROVIDERS_TABLE} pr ON pr.id_proveedor = l.id_proveedor WHERE c.id_lote_mp = ? AND l.estado_registro <> '${INACTIVE_STATE}' ORDER BY c.fecha_medicion DESC, c.id_control DESC`,
+};
+
+const productionProcessBaseQuery = `SELECT p.id_proceso, p.id_lote_mp, p.id_producto_resultado, p.cantidad_ingresada_kg, p.cantidad_producida_kg, p.rendimiento_porcentaje, p.estado_proceso, p.fecha_inicio, p.fecha_fin, p.cuarto_congelado, p.ubicacion_cuarto_congelado, p.observaciones, p.id_usuario_registro, u.nombre_completo AS usuario_nombre, l.id_producto AS id_producto_origen, lp.nombre AS lote_producto_nombre, l.peso_inicial_kg, l.peso_consumido_kg, l.peso_disponible_kg, l.estado_maduracion, pr.nombre AS producto_resultado_nombre, pr.unidad_medida AS producto_resultado_unidad FROM ${PRODUCTION_TABLE} p LEFT JOIN ${RAW_MATERIAL_LOTS_TABLE} l ON l.id_lote_mp = p.id_lote_mp LEFT JOIN ${PRODUCTS_TABLE} lp ON lp.id_producto = l.id_producto LEFT JOIN ${PRODUCTS_TABLE} pr ON pr.id_producto = p.id_producto_resultado LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = p.id_usuario_registro WHERE p.estado_registro <> '${INACTIVE_STATE}'`;
+
+const productionProcessListQuery = `SELECT base.*, COALESCE(etapas.total_etapas, 0) AS total_etapas, COALESCE(etapas.etapa_actual, '-') AS etapa_actual, COALESCE(mermas.total_merma_kg, 0) AS total_merma_kg, COALESCE(insumos.total_insumos, 0) AS total_insumos, COALESCE(cuartos.total_cuartos, 0) AS total_cuartos FROM (${productionProcessBaseQuery}) base LEFT JOIN (SELECT id_proceso, COUNT(*) AS total_etapas, MAX(nombre_etapa) AS etapa_actual FROM ${PRODUCTION_STAGE_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' GROUP BY id_proceso) etapas ON etapas.id_proceso = base.id_proceso LEFT JOIN (SELECT id_proceso, SUM(cantidad_kg) AS total_merma_kg FROM ${PRODUCTION_MERMA_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' GROUP BY id_proceso) mermas ON mermas.id_proceso = base.id_proceso LEFT JOIN (SELECT id_proceso, COUNT(*) AS total_insumos FROM ${PRODUCTION_INSUMO_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' GROUP BY id_proceso) insumos ON insumos.id_proceso = base.id_proceso LEFT JOIN (SELECT id_proceso, COUNT(*) AS total_cuartos FROM ${PRODUCTION_COLD_ROOM_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' GROUP BY id_proceso) cuartos ON cuartos.id_proceso = base.id_proceso ORDER BY base.fecha_inicio DESC, base.id_proceso DESC`;
+
+const productionStageQueries = {
+  findByProcess: `SELECT id_etapa, id_proceso, nombre_etapa, fecha_inicio, fecha_fin, personal_asignado, cantidad_entrada_kg, cantidad_salida_kg, merma_kg, observaciones, estado_registro, fecha_creacion, fecha_modificacion FROM ${PRODUCTION_STAGE_TABLE} WHERE id_proceso = ? AND estado_registro = '${ACTIVE_STATE}' ORDER BY fecha_inicio ASC, id_etapa ASC`,
+  findById: `SELECT id_etapa, id_proceso, nombre_etapa, fecha_inicio, fecha_fin, personal_asignado, cantidad_entrada_kg, cantidad_salida_kg, merma_kg, observaciones, estado_registro, fecha_creacion, fecha_modificacion FROM ${PRODUCTION_STAGE_TABLE} WHERE id_etapa = ?`,
+};
+
+const productionMermaQueries = {
+  findByProcess: `SELECT id_merma, id_proceso, id_etapa, categoria_merma, cantidad_kg, observaciones, fecha_registro, estado_registro, fecha_creacion, fecha_modificacion FROM ${PRODUCTION_MERMA_TABLE} WHERE id_proceso = ? AND estado_registro = '${ACTIVE_STATE}' ORDER BY fecha_registro DESC, id_merma DESC`,
+  findById: `SELECT id_merma, id_proceso, id_etapa, categoria_merma, cantidad_kg, observaciones, fecha_registro, estado_registro, fecha_creacion, fecha_modificacion FROM ${PRODUCTION_MERMA_TABLE} WHERE id_merma = ?`,
+};
+
+const productionInsumoQueries = {
+  findByProcess: `SELECT id_consumo, id_proceso, id_etapa, tipo_insumo, cantidad, unidad_medida, observaciones, fecha_registro, estado_registro, fecha_creacion, fecha_modificacion FROM ${PRODUCTION_INSUMO_TABLE} WHERE id_proceso = ? AND estado_registro = '${ACTIVE_STATE}' ORDER BY fecha_registro DESC, id_consumo DESC`,
+  findById: `SELECT id_consumo, id_proceso, id_etapa, tipo_insumo, cantidad, unidad_medida, observaciones, fecha_registro, estado_registro, fecha_creacion, fecha_modificacion FROM ${PRODUCTION_INSUMO_TABLE} WHERE id_consumo = ?`,
+};
+
+const productionColdRoomQueries = {
+  findByProcess: `SELECT id_ingreso_cuarto, id_proceso, fecha_ingreso, ubicacion_cuarto, cantidad_kg, observaciones, estado_registro, fecha_creacion, fecha_modificacion FROM ${PRODUCTION_COLD_ROOM_TABLE} WHERE id_proceso = ? AND estado_registro = '${ACTIVE_STATE}' ORDER BY fecha_ingreso DESC, id_ingreso_cuarto DESC`,
+  findById: `SELECT id_ingreso_cuarto, id_proceso, fecha_ingreso, ubicacion_cuarto, cantidad_kg, observaciones, estado_registro, fecha_creacion, fecha_modificacion FROM ${PRODUCTION_COLD_ROOM_TABLE} WHERE id_ingreso_cuarto = ?`,
+};
+
+const productionProcessQueries = {
+  findById: `SELECT id_proceso, id_lote_mp, id_producto_resultado, cantidad_ingresada_kg, cantidad_producida_kg, rendimiento_porcentaje, estado_proceso, fecha_inicio, fecha_fin, cuarto_congelado, ubicacion_cuarto_congelado, observaciones, id_usuario_registro, estado_registro FROM ${PRODUCTION_TABLE} WHERE id_proceso = ? AND estado_registro <> '${INACTIVE_STATE}'`,
+  findActiveByLot: `SELECT id_proceso FROM ${PRODUCTION_TABLE} WHERE id_lote_mp = ? AND estado_proceso IN ('${PRODUCTION_ACTIVE_STATE}', 'Pausado') AND estado_registro <> '${INACTIVE_STATE}' LIMIT 1`,
+  findLotForUpdate: `SELECT id_lote_mp, id_proveedor, peso_inicial_kg, peso_consumido_kg, peso_disponible_kg, estado_registro, estado_maduracion FROM ${RAW_MATERIAL_LOTS_TABLE} WHERE id_lote_mp = ? AND estado_registro <> '${INACTIVE_STATE}' FOR UPDATE`,
+};
+
+const loadProductionProcessDetail = async (connection, id) => {
+  const [processRows] = await connection.query(productionProcessBaseQuery + ' AND p.id_proceso = ? LIMIT 1', [id]);
+
+  if (processRows.length === 0) {
+    return null;
+  }
+
+  const [etapas] = await connection.query(productionStageQueries.findByProcess, [id]);
+  const [mermas] = await connection.query(productionMermaQueries.findByProcess, [id]);
+  const [insumos] = await connection.query(productionInsumoQueries.findByProcess, [id]);
+  const [cuartosFrio] = await connection.query(productionColdRoomQueries.findByProcess, [id]);
+
+  const process = processRows[0];
+  const totalMermaKg = mermas.reduce((sum, item) => sum + (Number(item.cantidad_kg) || 0), 0);
+  const totalInsumos = insumos.reduce((sum, item) => sum + (Number(item.cantidad) || 0), 0);
+
+  return {
+    ...process,
+    total_merma_kg: totalMermaKg,
+    total_insumos: totalInsumos,
+    etapas,
+    mermas,
+    insumos,
+    cuartos_frio: cuartosFrio,
+  };
 };
 
 const vehicleQueries = {
@@ -758,6 +823,319 @@ const handlers = {
   'maturationControls.remove': async ({ id }) => {
     const [result] = await pool.query(
       `DELETE FROM ${MATURATION_CONTROL_TABLE} WHERE id_control = ?`,
+      [id]
+    );
+    return result.affectedRows > 0;
+  },
+  'productionProcesses.findAll': async () => {
+    const [rows] = await pool.query(productionProcessListQuery);
+    return rows;
+  },
+  'productionProcesses.findById': async ({ id }) => {
+    return loadProductionProcessDetail(pool, id);
+  },
+  'productionProcesses.create': async ({
+    id_lote_mp,
+    id_producto_resultado,
+    cantidad_ingresada_kg,
+    fecha_inicio,
+    cuarto_congelado,
+    ubicacion_cuarto_congelado,
+    observaciones,
+    id_usuario_registro,
+  }) => {
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const [lotRows] = await connection.query(productionProcessQueries.findLotForUpdate, [id_lote_mp]);
+      if (lotRows.length === 0) {
+        await connection.rollback();
+        return null;
+      }
+
+      const lot = lotRows[0];
+      const availableKg = Number(lot.peso_disponible_kg ?? lot.peso_inicial_kg ?? 0);
+      const requestedKg = Number(cantidad_ingresada_kg);
+
+      if (!Number.isFinite(requestedKg) || requestedKg <= 0 || requestedKg > availableKg) {
+        await connection.rollback();
+        throw new Error('La cantidad ingresada supera el peso disponible del lote');
+      }
+
+      const [activeRows] = await connection.query(productionProcessQueries.findActiveByLot, [id_lote_mp]);
+      if (activeRows.length > 0) {
+        await connection.rollback();
+        throw new Error('El lote ya tiene un proceso de produccion activo');
+      }
+
+      await connection.query(
+        `UPDATE ${RAW_MATERIAL_LOTS_TABLE} SET peso_consumido_kg = peso_consumido_kg + ?, peso_disponible_kg = GREATEST(peso_disponible_kg - ?, 0) WHERE id_lote_mp = ?`,
+        [requestedKg, requestedKg, id_lote_mp]
+      );
+
+      const [result] = await connection.query(
+        `INSERT INTO ${PRODUCTION_TABLE} (id_lote_mp, id_producto_resultado, cantidad_ingresada_kg, estado_proceso, fecha_inicio, cuarto_congelado, ubicacion_cuarto_congelado, observaciones, id_usuario_registro, estado_registro) VALUES (?, ?, ?, ?, COALESCE(?, NOW()), ?, ?, ?, ?, ?)`,
+        [
+          id_lote_mp,
+          id_producto_resultado,
+          requestedKg,
+          PRODUCTION_ACTIVE_STATE,
+          fecha_inicio ?? null,
+          normalizeNullableText(cuarto_congelado),
+          normalizeNullableText(ubicacion_cuarto_congelado),
+          normalizeNullableText(observaciones),
+          id_usuario_registro ?? null,
+          ACTIVE_STATE,
+        ]
+      );
+
+      await connection.commit();
+      return loadProductionProcessDetail(connection, result.insertId);
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+  'productionProcesses.addStage': async ({
+    id,
+    nombre_etapa,
+    fecha_inicio,
+    fecha_fin,
+    personal_asignado,
+    cantidad_entrada_kg,
+    cantidad_salida_kg,
+    merma_kg,
+    observaciones,
+  }) => {
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const [processRows] = await connection.query(productionProcessQueries.findById, [id]);
+      if (processRows.length === 0 || processRows[0].estado_proceso === PRODUCTION_FINISHED_STATE) {
+        await connection.rollback();
+        return null;
+      }
+
+      const [result] = await connection.query(
+        `INSERT INTO ${PRODUCTION_STAGE_TABLE} (id_proceso, nombre_etapa, fecha_inicio, fecha_fin, personal_asignado, cantidad_entrada_kg, cantidad_salida_kg, merma_kg, observaciones, estado_registro) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          nombre_etapa,
+          fecha_inicio,
+          fecha_fin ?? null,
+          personal_asignado,
+          cantidad_entrada_kg ?? null,
+          cantidad_salida_kg ?? null,
+          merma_kg ?? null,
+          normalizeNullableText(observaciones),
+          ACTIVE_STATE,
+        ]
+      );
+
+      await connection.commit();
+      const [rows] = await connection.query(productionStageQueries.findById, [result.insertId]);
+      return rows[0] || null;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+  'productionProcesses.addMerma': async ({ id, id_etapa, categoria_merma, cantidad_kg, observaciones }) => {
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const [processRows] = await connection.query(productionProcessQueries.findById, [id]);
+      if (processRows.length === 0 || processRows[0].estado_proceso === PRODUCTION_FINISHED_STATE) {
+        await connection.rollback();
+        return null;
+      }
+
+      const [result] = await connection.query(
+        `INSERT INTO ${PRODUCTION_MERMA_TABLE} (id_proceso, id_etapa, categoria_merma, cantidad_kg, observaciones, estado_registro) VALUES (?, ?, ?, ?, ?, ?)`,
+        [id, id_etapa ?? null, categoria_merma, cantidad_kg, normalizeNullableText(observaciones), ACTIVE_STATE]
+      );
+
+      await connection.commit();
+      const [rows] = await connection.query(productionMermaQueries.findById, [result.insertId]);
+      return rows[0] || null;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+  'productionProcesses.addInsumo': async ({ id, id_etapa, tipo_insumo, cantidad, unidad_medida, observaciones }) => {
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const [processRows] = await connection.query(productionProcessQueries.findById, [id]);
+      if (processRows.length === 0 || processRows[0].estado_proceso === PRODUCTION_FINISHED_STATE) {
+        await connection.rollback();
+        return null;
+      }
+
+      const [result] = await connection.query(
+        `INSERT INTO ${PRODUCTION_INSUMO_TABLE} (id_proceso, id_etapa, tipo_insumo, cantidad, unidad_medida, observaciones, estado_registro) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [id, id_etapa ?? null, tipo_insumo, cantidad, unidad_medida, normalizeNullableText(observaciones), ACTIVE_STATE]
+      );
+
+      await connection.commit();
+      const [rows] = await connection.query(productionInsumoQueries.findById, [result.insertId]);
+      return rows[0] || null;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+  'productionProcesses.addColdRoomEntry': async ({ id, fecha_ingreso, ubicacion_cuarto, cantidad_kg, observaciones }) => {
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const [processRows] = await connection.query(productionProcessQueries.findById, [id]);
+      if (processRows.length === 0 || processRows[0].estado_proceso === PRODUCTION_FINISHED_STATE) {
+        await connection.rollback();
+        return null;
+      }
+
+      const [result] = await connection.query(
+        `INSERT INTO ${PRODUCTION_COLD_ROOM_TABLE} (id_proceso, fecha_ingreso, ubicacion_cuarto, cantidad_kg, observaciones, estado_registro) VALUES (?, ?, ?, ?, ?, ?)`,
+        [id, fecha_ingreso, ubicacion_cuarto, cantidad_kg, normalizeNullableText(observaciones), ACTIVE_STATE]
+      );
+
+      await connection.query(
+        `UPDATE ${PRODUCTION_TABLE} SET cuarto_congelado = COALESCE(?, cuarto_congelado), ubicacion_cuarto_congelado = COALESCE(?, ubicacion_cuarto_congelado) WHERE id_proceso = ?`,
+        [ubicacion_cuarto, ubicacion_cuarto, id]
+      );
+
+      await connection.commit();
+      const [rows] = await connection.query(productionColdRoomQueries.findById, [result.insertId]);
+      return rows[0] || null;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+  'productionProcesses.finalize': async ({
+    id,
+    cantidad_producida_kg,
+    fecha_fin,
+    fecha_vencimiento,
+    cuarto_congelado,
+    ubicacion_cuarto_congelado,
+    observaciones,
+    costo_unitario,
+  }) => {
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const [processRows] = await connection.query(productionProcessQueries.findById, [id]);
+      if (processRows.length === 0) {
+        await connection.rollback();
+        return null;
+      }
+
+      const process = processRows[0];
+
+      if (process.estado_proceso === PRODUCTION_FINISHED_STATE) {
+        await connection.rollback();
+        throw new Error('El proceso ya fue finalizado');
+      }
+
+      const inputKg = Number(process.cantidad_ingresada_kg || 0);
+      const outputKg = Number(cantidad_producida_kg || 0);
+
+      if (!Number.isFinite(outputKg) || outputKg < 0) {
+        await connection.rollback();
+        throw new Error('La cantidad producida no es valida');
+      }
+
+      if (outputKg > inputKg) {
+        await connection.rollback();
+        throw new Error('La cantidad producida no puede superar la cantidad ingresada');
+      }
+
+      const rendimiento = inputKg > 0 ? (outputKg / inputKg) * 100 : 0;
+
+      await connection.query(
+        `UPDATE ${PRODUCTION_TABLE} SET cantidad_producida_kg = ?, rendimiento_porcentaje = ?, estado_proceso = '${PRODUCTION_FINISHED_STATE}', fecha_fin = ?, cuarto_congelado = COALESCE(?, cuarto_congelado), ubicacion_cuarto_congelado = COALESCE(?, ubicacion_cuarto_congelado), observaciones = COALESCE(?, observaciones) WHERE id_proceso = ?`,
+        [
+          outputKg,
+          rendimiento,
+          fecha_fin,
+          normalizeNullableText(cuarto_congelado),
+          normalizeNullableText(ubicacion_cuarto_congelado),
+          normalizeNullableText(observaciones),
+          id,
+        ]
+      );
+
+      if (outputKg > 0) {
+        const [lotRows] = await connection.query(
+          `SELECT l.id_proveedor FROM ${RAW_MATERIAL_LOTS_TABLE} l WHERE l.id_lote_mp = ? LIMIT 1`,
+          [process.id_lote_mp]
+        );
+        const supplierId = lotRows[0]?.id_proveedor ?? null;
+
+        const [existingInventoryRows] = await connection.query(
+          `SELECT id_existencia FROM ${INVENTORY_TABLE} WHERE id_proceso_origen = ? AND id_producto = ? AND estado_registro = '${ACTIVE_STATE}' LIMIT 1`,
+          [id, process.id_producto_resultado]
+        );
+
+        let existenceId;
+
+        if (existingInventoryRows.length > 0) {
+          existenceId = existingInventoryRows[0].id_existencia;
+          await connection.query(
+            `UPDATE ${INVENTORY_TABLE} SET id_proveedor = ?, fecha_vencimiento = ?, costo_unitario = COALESCE(?, costo_unitario), estado_registro = '${ACTIVE_STATE}' WHERE id_existencia = ?`,
+            [supplierId, fecha_vencimiento, costo_unitario ?? null, existenceId]
+          );
+        } else {
+          const [existenceResult] = await connection.query(
+            `INSERT INTO ${INVENTORY_TABLE} (id_producto, id_proveedor, id_proceso_origen, id_entrada_origen, fecha_vencimiento, cantidad_disponible, costo_unitario, estado_registro) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)`,
+            [process.id_producto_resultado, supplierId, id, fecha_vencimiento, 0, costo_unitario ?? null, ACTIVE_STATE]
+          );
+          existenceId = existenceResult.insertId;
+        }
+
+        await connection.query(
+          `INSERT INTO ${MOVEMENTS_TABLE} (id_existencia, tipo_movimiento, cantidad, motivo, id_usuario, estado_registro) VALUES (?, 'Entrada', ?, ?, ?, ?)`,
+          [existenceId, outputKg, `Produccion finalizada #${id}`, process.id_usuario_registro ?? null, ACTIVE_STATE]
+        );
+      }
+
+      await connection.commit();
+      return loadProductionProcessDetail(connection, id);
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+  'productionProcesses.remove': async ({ id }) => {
+    const [result] = await pool.query(
+      `UPDATE ${PRODUCTION_TABLE} SET estado_registro = '${INACTIVE_STATE}' WHERE id_proceso = ? AND estado_registro <> '${INACTIVE_STATE}'`,
       [id]
     );
     return result.affectedRows > 0;

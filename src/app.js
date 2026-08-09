@@ -7,6 +7,7 @@ const providerRoutes = require('./routes/provider.routes');
 const clientRoutes = require('./routes/client.routes');
 const entradasMercanciaRoutes = require('./routes/entradas_mercancia.routes');
 const maturationRoutes = require('./routes/maturation.routes');
+const productionRoutes = require('./routes/production.routes');
 const productRoutes = require('./routes/product.routes');
 const inventoryRoutes = require('./routes/inventory.routes');
 const serviceTypeRoutes = require('./routes/service_type.routes');
@@ -49,6 +50,12 @@ app.use(
   authenticateToken,
   authorizeRoles('Administrador', 'Produccion', 'Logistica'),
   maturationRoutes
+);
+app.use(
+  '/api/produccion',
+  authenticateToken,
+  authorizeRoles('Administrador', 'Produccion'),
+  productionRoutes
 );
 app.use(
   '/api/productos',
