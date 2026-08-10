@@ -55,7 +55,35 @@ const validateProcessPayload = (payload) => {
   return null;
 };
 
+const isPositiveInteger = (value) => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0;
+};
+
 const validateStagePayload = (payload) => {
+  const stage = String(payload.nombre_etapa || '').trim();
+  const quantityIn = emptyToNull(payload.cantidad_entrada_kg);
+
+  if (!PRODUCTION_STAGES.includes(stage)) {
+    return `nombre_etapa invalido. Valores permitidos: ${PRODUCTION_STAGES.join(', ')}`;
+  }
+
+  if (!payload.fecha_inicio) {
+    return 'fecha_inicio es obligatoria';
+  }
+
+  if (!isPositiveInteger(payload.cantidad_personas)) {
+    return 'cantidad_personas es obligatoria y debe ser un numero entero mayor a 0';
+  }
+
+  if (quantityIn !== null && Number.isNaN(Number(quantityIn))) {
+    return 'cantidad_entrada_kg debe ser numerica';
+  }
+
+  return null;
+};
+
+const validateStageUpdatePayload = (payload) => {
   const stage = String(payload.nombre_etapa || '').trim();
   const quantityIn = emptyToNull(payload.cantidad_entrada_kg);
   const quantityOut = emptyToNull(payload.cantidad_salida_kg);
@@ -69,8 +97,8 @@ const validateStagePayload = (payload) => {
     return 'fecha_inicio es obligatoria';
   }
 
-  if (!payload.personal_asignado || !String(payload.personal_asignado).trim()) {
-    return 'personal_asignado es obligatorio';
+  if (!isPositiveInteger(payload.cantidad_personas)) {
+    return 'cantidad_personas es obligatoria y debe ser un numero entero mayor a 0';
   }
 
   if (quantityIn !== null && Number.isNaN(Number(quantityIn))) {
@@ -249,12 +277,10 @@ const addEtapa = async (req, res, next) => {
 
     const stage = await productionModel.addStage(id, {
       nombre_etapa: String(req.body.nombre_etapa).trim(),
+      cantidad_personas: Number.parseInt(req.body.cantidad_personas, 10),
+      personal_asignado: req.body.personal_asignado,
       fecha_inicio: formatDateTime(req.body.fecha_inicio),
-      fecha_fin: formatDateTime(req.body.fecha_fin),
-      personal_asignado: String(req.body.personal_asignado).trim(),
       cantidad_entrada_kg: emptyToNull(req.body.cantidad_entrada_kg) === null ? null : Number(req.body.cantidad_entrada_kg),
-      cantidad_salida_kg: emptyToNull(req.body.cantidad_salida_kg) === null ? null : Number(req.body.cantidad_salida_kg),
-      merma_kg: emptyToNull(req.body.merma_kg) === null ? null : Number(req.body.merma_kg),
       observaciones: req.body.observaciones,
     });
 
@@ -263,6 +289,43 @@ const addEtapa = async (req, res, next) => {
     }
 
     return res.status(201).json(stage);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const updateEtapa = async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+    const idEtapa = parseId(req.params.id_etapa);
+
+    if (Number.isNaN(id) || Number.isNaN(idEtapa)) {
+      return res.status(400).json({ message: 'ID invalido' });
+    }
+
+    const validationError = validateStageUpdatePayload(req.body);
+
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+
+    const stage = await productionModel.updateStage(id, idEtapa, {
+      nombre_etapa: String(req.body.nombre_etapa).trim(),
+      cantidad_personas: Number.parseInt(req.body.cantidad_personas, 10),
+      personal_asignado: req.body.personal_asignado,
+      fecha_inicio: formatDateTime(req.body.fecha_inicio),
+      fecha_fin: formatDateTime(req.body.fecha_fin),
+      cantidad_entrada_kg: emptyToNull(req.body.cantidad_entrada_kg) === null ? null : Number(req.body.cantidad_entrada_kg),
+      cantidad_salida_kg: emptyToNull(req.body.cantidad_salida_kg) === null ? null : Number(req.body.cantidad_salida_kg),
+      merma_kg: emptyToNull(req.body.merma_kg) === null ? null : Number(req.body.merma_kg),
+      observaciones: req.body.observaciones,
+    });
+
+    if (!stage) {
+      return res.status(404).json({ message: 'Etapa no encontrada' });
+    }
+
+    return res.status(200).json(stage);
   } catch (error) {
     return next(error);
   }
@@ -432,6 +495,7 @@ module.exports = {
   getProcesoById,
   createProceso,
   addEtapa,
+  updateEtapa,
   addMerma,
   addInsumo,
   addColdRoomEntry,

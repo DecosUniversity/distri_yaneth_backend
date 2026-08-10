@@ -10,6 +10,7 @@ router.get('/procesos', productionController.getProcesos);
 router.get('/procesos/:id', productionController.getProcesoById);
 router.post('/procesos', productionController.createProceso);
 router.post('/procesos/:id/etapas', productionController.addEtapa);
+router.put('/procesos/:id/etapas/:id_etapa', productionController.updateEtapa);
 router.post('/procesos/:id/mermas', productionController.addMerma);
 router.post('/procesos/:id/insumos', productionController.addInsumo);
 router.post('/procesos/:id/cuarto-frio', productionController.addColdRoomEntry);

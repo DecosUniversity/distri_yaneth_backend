@@ -22,7 +22,4 @@ router.get('/controles/sublote/:id_sublote', maturationController.getControlesBy
 router.post('/controles', maturationController.createControl);
 router.delete('/controles/:id', maturationController.deleteControl);
 
-router.get('/redes-verdes/sublote/:id_sublote', maturationController.getRedesBySublote);
-router.post('/redes-verdes', maturationController.createRed);
-
 module.exports = router;

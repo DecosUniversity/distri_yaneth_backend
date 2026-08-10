@@ -112,17 +112,20 @@ const maturationControlQueries = {
   findBySublot: `${maturationControlBaseQuery} WHERE c.id_sublote = ? ORDER BY c.fecha_medicion DESC, c.id_control DESC`,
 };
 
+const greenNetBaseQuery = `SELECT r.id_red, r.id_sublote, s.codigo_sublote, s.id_lote_mp, r.id_existencia, r.peso_kg, r.id_usuario, u.nombre_completo AS usuario_nombre, r.fecha_empaque, pr.id_producto, pr.nombre AS producto_nombre, l.id_proveedor AS id_proveedor_origen, l.id_entrada_origen AS id_entrada_origen FROM ${GREEN_NET_TABLE} r LEFT JOIN ${MATURATION_SUBLOT_TABLE} s ON s.id_sublote = r.id_sublote LEFT JOIN ${RAW_MATERIAL_LOTS_TABLE} l ON l.id_lote_mp = s.id_lote_mp LEFT JOIN ${INVENTORY_TABLE} ie ON ie.id_existencia = r.id_existencia LEFT JOIN ${PRODUCTS_TABLE} pr ON pr.id_producto = ie.id_producto LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = r.id_usuario`;
+
 const greenNetQueries = {
-  findBySublot: `SELECT r.id_red, r.id_sublote, r.id_existencia, r.peso_kg, r.id_usuario, u.nombre_completo AS usuario_nombre, r.fecha_empaque FROM ${GREEN_NET_TABLE} r LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = r.id_usuario WHERE r.id_sublote = ? ORDER BY r.fecha_empaque DESC, r.id_red DESC`,
+  findAll: `${greenNetBaseQuery} ORDER BY r.fecha_empaque DESC, r.id_red DESC`,
+  findBySublot: `${greenNetBaseQuery} WHERE r.id_sublote = ? ORDER BY r.fecha_empaque DESC, r.id_red DESC`,
 };
 
-const productionProcessBaseQuery = `SELECT p.id_proceso, p.id_sublote, p.id_producto_resultado, p.cantidad_ingresada_kg, p.cantidad_producida_kg, p.rendimiento_porcentaje, p.estado_proceso, p.fecha_inicio, p.fecha_fin, p.cuarto_congelado, p.ubicacion_cuarto_congelado, p.observaciones, p.id_usuario_registro, u.nombre_completo AS usuario_nombre, s.codigo_sublote, s.peso_kg AS sublote_peso_disponible, s.peso_neto_maduracion_kg, s.estado_maduracion, l.id_lote_mp, l.id_proveedor AS id_proveedor_origen, l.id_producto AS id_producto_origen, lp.nombre AS lote_producto_nombre, pr.nombre AS producto_resultado_nombre, pr.unidad_medida AS producto_resultado_unidad FROM ${PRODUCTION_TABLE} p LEFT JOIN ${MATURATION_SUBLOT_TABLE} s ON s.id_sublote = p.id_sublote LEFT JOIN ${RAW_MATERIAL_LOTS_TABLE} l ON l.id_lote_mp = s.id_lote_mp LEFT JOIN ${PRODUCTS_TABLE} lp ON lp.id_producto = l.id_producto LEFT JOIN ${PRODUCTS_TABLE} pr ON pr.id_producto = p.id_producto_resultado LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = p.id_usuario_registro WHERE p.estado_registro <> '${INACTIVE_STATE}'`;
+const productionProcessBaseQuery = `SELECT p.id_proceso, p.id_sublote, p.id_producto_resultado, p.cantidad_ingresada_kg, p.cantidad_producida_kg, p.rendimiento_porcentaje, p.estado_proceso, p.fecha_inicio, p.fecha_fin, p.cuarto_congelado, p.ubicacion_cuarto_congelado, p.observaciones, p.id_usuario_registro, u.nombre_completo AS usuario_nombre, s.codigo_sublote, s.peso_kg AS sublote_peso_disponible, s.peso_neto_maduracion_kg, s.estado_maduracion, l.id_lote_mp, l.id_proveedor AS id_proveedor_origen, l.id_entrada_origen AS id_entrada_origen, l.id_producto AS id_producto_origen, lp.nombre AS lote_producto_nombre, pr.nombre AS producto_resultado_nombre, pr.unidad_medida AS producto_resultado_unidad FROM ${PRODUCTION_TABLE} p LEFT JOIN ${MATURATION_SUBLOT_TABLE} s ON s.id_sublote = p.id_sublote LEFT JOIN ${RAW_MATERIAL_LOTS_TABLE} l ON l.id_lote_mp = s.id_lote_mp LEFT JOIN ${PRODUCTS_TABLE} lp ON lp.id_producto = l.id_producto LEFT JOIN ${PRODUCTS_TABLE} pr ON pr.id_producto = p.id_producto_resultado LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = p.id_usuario_registro WHERE p.estado_registro <> '${INACTIVE_STATE}'`;
 
 const productionProcessListQuery = `SELECT base.*, COALESCE(etapas.total_etapas, 0) AS total_etapas, COALESCE(etapas.etapa_actual, '-') AS etapa_actual, COALESCE(mermas.total_merma_kg, 0) AS total_merma_kg, COALESCE(insumos.total_insumos, 0) AS total_insumos, COALESCE(cuartos.total_cuartos, 0) AS total_cuartos FROM (${productionProcessBaseQuery}) base LEFT JOIN (SELECT id_proceso, COUNT(*) AS total_etapas, MAX(nombre_etapa) AS etapa_actual FROM ${PRODUCTION_STAGE_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' GROUP BY id_proceso) etapas ON etapas.id_proceso = base.id_proceso LEFT JOIN (SELECT id_proceso, SUM(cantidad_kg) AS total_merma_kg FROM ${PRODUCTION_MERMA_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' GROUP BY id_proceso) mermas ON mermas.id_proceso = base.id_proceso LEFT JOIN (SELECT id_proceso, COUNT(*) AS total_insumos FROM ${PRODUCTION_INSUMO_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' GROUP BY id_proceso) insumos ON insumos.id_proceso = base.id_proceso LEFT JOIN (SELECT id_proceso, COUNT(*) AS total_cuartos FROM ${PRODUCTION_COLD_ROOM_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' GROUP BY id_proceso) cuartos ON cuartos.id_proceso = base.id_proceso ORDER BY base.fecha_inicio DESC, base.id_proceso DESC`;
 
 const productionStageQueries = {
-  findByProcess: `SELECT id_etapa, id_proceso, nombre_etapa, fecha_inicio, fecha_fin, personal_asignado, cantidad_entrada_kg, cantidad_salida_kg, merma_kg, observaciones, estado_registro, fecha_creacion, fecha_modificacion FROM ${PRODUCTION_STAGE_TABLE} WHERE id_proceso = ? AND estado_registro = '${ACTIVE_STATE}' ORDER BY fecha_inicio ASC, id_etapa ASC`,
-  findById: `SELECT id_etapa, id_proceso, nombre_etapa, fecha_inicio, fecha_fin, personal_asignado, cantidad_entrada_kg, cantidad_salida_kg, merma_kg, observaciones, estado_registro, fecha_creacion, fecha_modificacion FROM ${PRODUCTION_STAGE_TABLE} WHERE id_etapa = ?`,
+  findByProcess: `SELECT id_etapa, id_proceso, nombre_etapa, cantidad_personas, personal_asignado, fecha_inicio, fecha_fin, cantidad_entrada_kg, cantidad_salida_kg, merma_kg, observaciones, estado_registro, fecha_creacion, fecha_modificacion FROM ${PRODUCTION_STAGE_TABLE} WHERE id_proceso = ? AND estado_registro = '${ACTIVE_STATE}' ORDER BY fecha_inicio ASC, id_etapa ASC`,
+  findById: `SELECT id_etapa, id_proceso, nombre_etapa, cantidad_personas, personal_asignado, fecha_inicio, fecha_fin, cantidad_entrada_kg, cantidad_salida_kg, merma_kg, observaciones, estado_registro, fecha_creacion, fecha_modificacion FROM ${PRODUCTION_STAGE_TABLE} WHERE id_etapa = ?`,
 };
 
 const productionMermaQueries = {
@@ -1115,6 +1118,10 @@ const handlers = {
     );
     return result.affectedRows > 0;
   },
+  'greenNets.findAll': async () => {
+    const [rows] = await pool.query(greenNetQueries.findAll);
+    return rows;
+  },
   'greenNets.findBySublot': async ({ id_sublote }) => {
     const [rows] = await pool.query(greenNetQueries.findBySublot, [id_sublote]);
     return rows;
@@ -1194,10 +1201,7 @@ const handlers = {
 
       await connection.commit();
 
-      const [rows] = await pool.query(
-        `SELECT r.id_red, r.id_sublote, r.id_existencia, r.peso_kg, r.id_usuario, r.fecha_empaque FROM ${GREEN_NET_TABLE} r WHERE r.id_red = ?`,
-        [redResult.insertId]
-      );
+      const [rows] = await pool.query(`${greenNetBaseQuery} WHERE r.id_red = ?`, [redResult.insertId]);
 
       return rows[0] || null;
     } catch (error) {
@@ -1280,12 +1284,10 @@ const handlers = {
   'productionProcesses.addStage': async ({
     id,
     nombre_etapa,
-    fecha_inicio,
-    fecha_fin,
+    cantidad_personas,
     personal_asignado,
+    fecha_inicio,
     cantidad_entrada_kg,
-    cantidad_salida_kg,
-    merma_kg,
     observaciones,
   }) => {
     const connection = await pool.getConnection();
@@ -1300,16 +1302,14 @@ const handlers = {
       }
 
       const [result] = await connection.query(
-        `INSERT INTO ${PRODUCTION_STAGE_TABLE} (id_proceso, nombre_etapa, fecha_inicio, fecha_fin, personal_asignado, cantidad_entrada_kg, cantidad_salida_kg, merma_kg, observaciones, estado_registro) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ${PRODUCTION_STAGE_TABLE} (id_proceso, nombre_etapa, cantidad_personas, personal_asignado, fecha_inicio, cantidad_entrada_kg, observaciones, estado_registro) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           nombre_etapa,
+          cantidad_personas,
+          normalizeNullableText(personal_asignado),
           fecha_inicio,
-          fecha_fin ?? null,
-          personal_asignado,
           cantidad_entrada_kg ?? null,
-          cantidad_salida_kg ?? null,
-          merma_kg ?? null,
           normalizeNullableText(observaciones),
           ACTIVE_STATE,
         ]
@@ -1324,6 +1324,43 @@ const handlers = {
     } finally {
       connection.release();
     }
+  },
+  'productionProcesses.updateStage': async ({
+    id,
+    id_etapa,
+    nombre_etapa,
+    cantidad_personas,
+    personal_asignado,
+    fecha_inicio,
+    fecha_fin,
+    cantidad_entrada_kg,
+    cantidad_salida_kg,
+    merma_kg,
+    observaciones,
+  }) => {
+    const [result] = await pool.query(
+      `UPDATE ${PRODUCTION_STAGE_TABLE} SET nombre_etapa = ?, cantidad_personas = ?, personal_asignado = ?, fecha_inicio = ?, fecha_fin = ?, cantidad_entrada_kg = ?, cantidad_salida_kg = ?, merma_kg = ?, observaciones = ? WHERE id_etapa = ? AND id_proceso = ? AND estado_registro = '${ACTIVE_STATE}'`,
+      [
+        nombre_etapa,
+        cantidad_personas ?? null,
+        normalizeNullableText(personal_asignado),
+        fecha_inicio,
+        fecha_fin ?? null,
+        cantidad_entrada_kg ?? null,
+        cantidad_salida_kg ?? null,
+        merma_kg ?? null,
+        normalizeNullableText(observaciones),
+        id_etapa,
+        id,
+      ]
+    );
+
+    if (result.affectedRows === 0) {
+      return null;
+    }
+
+    const [rows] = await pool.query(productionStageQueries.findById, [id_etapa]);
+    return rows[0] || null;
   },
   'productionProcesses.addMerma': async ({ id, id_etapa, id_tipo_merma, cantidad_kg, observaciones }) => {
     const connection = await pool.getConnection();

@@ -19,6 +19,14 @@ const addStage = async (id, payload) => {
   });
 };
 
+const updateStage = async (id, id_etapa, payload) => {
+  return enqueueDbJob('productionProcesses.updateStage', {
+    id,
+    id_etapa,
+    ...payload,
+  });
+};
+
 const addMerma = async (id, payload) => {
   return enqueueDbJob('productionProcesses.addMerma', {
     id,
@@ -56,6 +64,7 @@ module.exports = {
   findById,
   create,
   addStage,
+  updateStage,
   addMerma,
   addInsumo,
   addColdRoomEntry,
