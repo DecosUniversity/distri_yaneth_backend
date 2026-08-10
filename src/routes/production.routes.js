@@ -1,7 +1,10 @@
 const { Router } = require('express');
 const productionController = require('../controllers/production.controller');
+const mermaTypeController = require('../controllers/merma_type.controller');
 
 const router = Router();
+
+router.get('/tipos-merma', mermaTypeController.getMermaTypes);
 
 router.get('/procesos', productionController.getProcesos);
 router.get('/procesos/:id', productionController.getProcesoById);

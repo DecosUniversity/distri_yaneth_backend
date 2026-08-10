@@ -23,10 +23,15 @@ const remove = async (id) => {
   return enqueueDbJob('maturationLots.remove', { id });
 };
 
+const accept = async (id, payload) => {
+  return enqueueDbJob('maturationLots.accept', { id, ...payload });
+};
+
 module.exports = {
   findAll,
   findById,
   create,
   update,
   remove,
+  accept,
 };

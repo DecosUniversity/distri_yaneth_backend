@@ -1,9 +1,32 @@
 const maturationLotModel = require('../models/maturation_lot.model');
+const maturationSublotModel = require('../models/maturation_sublot.model');
 const maturationControlModel = require('../models/maturation_control.model');
+const greenNetModel = require('../models/green_net.model');
+const productModel = require('../models/product.model');
 const entradasMercanciaModel = require('../models/entradas_mercancia.model');
 
 const parseId = (value) => Number.parseInt(value, 10);
 const MATURATION_REGISTRATION_STATES = ['Pendiente', 'Activo', 'Completo', 'Inactivo'];
+const RIPENESS_STATES = ['Verde', 'Sarazo', 'Maduro', 'Sobre maduro'];
+const FINISHED_PRODUCT_TYPE = 'Producto Terminado';
+const BUSINESS_RULE_MESSAGES = [
+  'El sub-lote no esta disponible para cerrar maduracion',
+  'Se requiere peso_medido_kg para cerrar la maduracion; no hay mediciones previas con peso capturado',
+  'El peso medido no puede ser mayor al peso disponible del sub-lote',
+  'El peso a fraccionar supera el peso disponible del sub-lote',
+  'El sub-lote debe estar Verde y activo para empacar como red',
+  'El peso de la red supera el peso disponible del sub-lote',
+];
+
+const emptyToNull = (value) => (value === undefined || value === null || value === '' ? null : value);
+
+const handleMaturationError = (error, res, next) => {
+  if (BUSINESS_RULE_MESSAGES.includes(error.message)) {
+    return res.status(400).json({ message: error.message });
+  }
+
+  return next(error);
+};
 
 const validateLotPayload = (payload) => {
   const parsedProductId = Number.parseInt(payload.id_producto, 10);
@@ -26,11 +49,7 @@ const validateLotPayload = (payload) => {
     return 'id_proveedor es obligatorio y debe ser valido';
   }
 
-  if (parsedEntryOriginId === null) {
-    return 'id_entrada_origen es obligatorio y debe ser valido';
-  }
-
-  if (Number.isNaN(parsedEntryOriginId) || parsedEntryOriginId <= 0) {
+  if (parsedEntryOriginId === null || Number.isNaN(parsedEntryOriginId) || parsedEntryOriginId <= 0) {
     return 'id_entrada_origen es obligatorio y debe ser valido';
   }
 
@@ -79,22 +98,29 @@ const normalizeLotPayload = (payload) => ({
 });
 
 const validateControlPayload = (payload) => {
-  const parsedLotId = Number.parseInt(payload.id_lote_mp, 10);
+  const parsedSublotId = Number.parseInt(payload.id_sublote, 10);
   const parsedBrix = Number(payload.grados_brix);
-  const parsedTemperatura =
-    payload.temperatura_cuarto === undefined || payload.temperatura_cuarto === null || payload.temperatura_cuarto === ''
-      ? null
-      : Number(payload.temperatura_cuarto);
+  const parsedPesoMedido = emptyToNull(payload.peso_medido_kg);
+  const parsedMateriaSeca = emptyToNull(payload.porcentaje_materia_seca);
+  const parsedTemperatura = emptyToNull(payload.temperatura_cuarto);
 
-  if (Number.isNaN(parsedLotId) || parsedLotId <= 0) {
-    return 'id_lote_mp es obligatorio y debe ser valido';
+  if (Number.isNaN(parsedSublotId) || parsedSublotId <= 0) {
+    return 'id_sublote es obligatorio y debe ser valido';
   }
 
   if (Number.isNaN(parsedBrix) || parsedBrix < 0) {
     return 'grados_brix debe ser numerico y mayor o igual a 0';
   }
 
-  if (parsedTemperatura !== null && Number.isNaN(parsedTemperatura)) {
+  if (parsedPesoMedido !== null && Number.isNaN(Number(parsedPesoMedido))) {
+    return 'peso_medido_kg debe ser numerico';
+  }
+
+  if (parsedMateriaSeca !== null && Number.isNaN(Number(parsedMateriaSeca))) {
+    return 'porcentaje_materia_seca debe ser numerico';
+  }
+
+  if (parsedTemperatura !== null && Number.isNaN(Number(parsedTemperatura))) {
     return 'temperatura_cuarto debe ser numerica';
   }
 
@@ -102,16 +128,14 @@ const validateControlPayload = (payload) => {
 };
 
 const normalizeControlPayload = (payload) => ({
-  id_lote_mp: Number.parseInt(payload.id_lote_mp, 10),
+  id_sublote: Number.parseInt(payload.id_sublote, 10),
   grados_brix: Number(payload.grados_brix),
-  temperatura_cuarto:
-    payload.temperatura_cuarto === undefined || payload.temperatura_cuarto === null || payload.temperatura_cuarto === ''
-      ? null
-      : Number(payload.temperatura_cuarto),
+  peso_medido_kg: emptyToNull(payload.peso_medido_kg) === null ? null : Number(payload.peso_medido_kg),
+  porcentaje_materia_seca:
+    emptyToNull(payload.porcentaje_materia_seca) === null ? null : Number(payload.porcentaje_materia_seca),
+  temperatura_cuarto: emptyToNull(payload.temperatura_cuarto) === null ? null : Number(payload.temperatura_cuarto),
   observaciones:
-    typeof payload.observaciones === 'string' && payload.observaciones.trim()
-      ? payload.observaciones.trim()
-      : null,
+    typeof payload.observaciones === 'string' && payload.observaciones.trim() ? payload.observaciones.trim() : null,
 });
 
 const getLotes = async (_req, res, next) => {
@@ -242,6 +266,144 @@ const deleteLote = async (req, res, next) => {
   }
 };
 
+const acceptLote = async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ message: 'ID invalido' });
+    }
+
+    const estadoMaduracion = String(req.body.estado_maduracion || '').trim();
+
+    if (!RIPENESS_STATES.includes(estadoMaduracion)) {
+      return res.status(400).json({
+        message: `estado_maduracion invalido. Valores permitidos: ${RIPENESS_STATES.join(', ')}`,
+      });
+    }
+
+    const sublote = await maturationLotModel.accept(id, { estado_maduracion: estadoMaduracion });
+
+    if (!sublote) {
+      return res.status(404).json({ message: 'Lote no encontrado o no esta pendiente de aceptacion' });
+    }
+
+    return res.status(201).json(sublote);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const getSublotes = async (_req, res, next) => {
+  try {
+    const sublotes = await maturationSublotModel.findAll();
+    return res.status(200).json(sublotes);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const getSubloteById = async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ message: 'ID invalido' });
+    }
+
+    const sublote = await maturationSublotModel.findById(id);
+
+    if (!sublote) {
+      return res.status(404).json({ message: 'Sub-lote no encontrado' });
+    }
+
+    return res.status(200).json(sublote);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const getSublotesByLote = async (req, res, next) => {
+  try {
+    const idLote = parseId(req.params.id_lote_mp);
+
+    if (Number.isNaN(idLote)) {
+      return res.status(400).json({ message: 'id_lote_mp invalido' });
+    }
+
+    const sublotes = await maturationSublotModel.findByLot(idLote);
+    return res.status(200).json(sublotes);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const getSublotesListosParaProduccion = async (_req, res, next) => {
+  try {
+    const sublotes = await maturationSublotModel.findReadyForProduction();
+    return res.status(200).json(sublotes);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const splitSublote = async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ message: 'ID invalido' });
+    }
+
+    const pesoKg = Number(req.body.peso_kg);
+
+    if (Number.isNaN(pesoKg) || pesoKg <= 0) {
+      return res.status(400).json({ message: 'peso_kg debe ser mayor a 0' });
+    }
+
+    const result = await maturationSublotModel.split(id, {
+      peso_kg: pesoKg,
+      observaciones: req.body.observaciones,
+    });
+
+    if (!result) {
+      return res.status(404).json({ message: 'Sub-lote no encontrado o no esta activo' });
+    }
+
+    return res.status(201).json(result);
+  } catch (error) {
+    return handleMaturationError(error, res, next);
+  }
+};
+
+const closeSublote = async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ message: 'ID invalido' });
+    }
+
+    const pesoMedido = emptyToNull(req.body.peso_medido_kg);
+
+    if (pesoMedido !== null && Number.isNaN(Number(pesoMedido))) {
+      return res.status(400).json({ message: 'peso_medido_kg debe ser numerico' });
+    }
+
+    const sublote = await maturationSublotModel.close(id, {
+      peso_medido_kg: pesoMedido === null ? undefined : Number(pesoMedido),
+    });
+
+    if (!sublote) {
+      return res.status(404).json({ message: 'Sub-lote no encontrado' });
+    }
+
+    return res.status(200).json(sublote);
+  } catch (error) {
+    return handleMaturationError(error, res, next);
+  }
+};
+
 const getControles = async (_req, res, next) => {
   try {
     const controls = await maturationControlModel.findAll();
@@ -251,15 +413,15 @@ const getControles = async (_req, res, next) => {
   }
 };
 
-const getControlesByLote = async (req, res, next) => {
+const getControlesBySublote = async (req, res, next) => {
   try {
-    const idLote = parseId(req.params.id_lote_mp);
+    const idSublote = parseId(req.params.id_sublote);
 
-    if (Number.isNaN(idLote)) {
-      return res.status(400).json({ message: 'id_lote_mp invalido' });
+    if (Number.isNaN(idSublote)) {
+      return res.status(400).json({ message: 'id_sublote invalido' });
     }
 
-    const controls = await maturationControlModel.findByLot(idLote);
+    const controls = await maturationControlModel.findBySublot(idSublote);
     return res.status(200).json(controls);
   } catch (error) {
     return next(error);
@@ -301,14 +463,89 @@ const deleteControl = async (req, res, next) => {
   }
 };
 
+const getRedesBySublote = async (req, res, next) => {
+  try {
+    const idSublote = parseId(req.params.id_sublote);
+
+    if (Number.isNaN(idSublote)) {
+      return res.status(400).json({ message: 'id_sublote invalido' });
+    }
+
+    const redes = await greenNetModel.findBySublot(idSublote);
+    return res.status(200).json(redes);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const createRed = async (req, res, next) => {
+  try {
+    const idSublote = parseId(req.body.id_sublote);
+    const idProducto = parseId(req.body.id_producto);
+    const pesoKg = Number(req.body.peso_kg);
+
+    if (Number.isNaN(idSublote) || idSublote <= 0) {
+      return res.status(400).json({ message: 'id_sublote es obligatorio y debe ser valido' });
+    }
+
+    if (Number.isNaN(idProducto) || idProducto <= 0) {
+      return res.status(400).json({ message: 'id_producto es obligatorio y debe ser valido' });
+    }
+
+    if (Number.isNaN(pesoKg) || pesoKg <= 0) {
+      return res.status(400).json({ message: 'peso_kg debe ser mayor a 0' });
+    }
+
+    if (!req.body.fecha_vencimiento) {
+      return res.status(400).json({ message: 'fecha_vencimiento es obligatoria' });
+    }
+
+    const product = await productModel.findById(idProducto);
+
+    if (!product) {
+      return res.status(404).json({ message: 'Producto no encontrado' });
+    }
+
+    if (String(product.tipo_producto || '').trim() !== FINISHED_PRODUCT_TYPE) {
+      return res.status(400).json({ message: 'El producto debe ser de tipo Producto Terminado' });
+    }
+
+    const red = await greenNetModel.create({
+      id_sublote: idSublote,
+      id_producto: idProducto,
+      peso_kg: pesoKg,
+      fecha_vencimiento: String(req.body.fecha_vencimiento).slice(0, 10),
+      costo_unitario: emptyToNull(req.body.costo_unitario) === null ? null : Number(req.body.costo_unitario),
+      id_usuario: req.auth?.sub || null,
+    });
+
+    if (!red) {
+      return res.status(404).json({ message: 'Sub-lote no encontrado' });
+    }
+
+    return res.status(201).json(red);
+  } catch (error) {
+    return handleMaturationError(error, res, next);
+  }
+};
+
 module.exports = {
   getLotes,
   getLoteById,
   createLote,
   updateLote,
   deleteLote,
+  acceptLote,
+  getSublotes,
+  getSubloteById,
+  getSublotesByLote,
+  getSublotesListosParaProduccion,
+  splitSublote,
+  closeSublote,
   getControles,
-  getControlesByLote,
+  getControlesBySublote,
   createControl,
   deleteControl,
+  getRedesBySublote,
+  createRed,
 };

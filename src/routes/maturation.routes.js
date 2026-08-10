@@ -8,10 +8,21 @@ router.get('/lotes/:id', maturationController.getLoteById);
 router.post('/lotes', maturationController.createLote);
 router.put('/lotes/:id', maturationController.updateLote);
 router.delete('/lotes/:id', maturationController.deleteLote);
+router.post('/lotes/:id/aceptar', maturationController.acceptLote);
+
+router.get('/sublotes', maturationController.getSublotes);
+router.get('/sublotes/listos-para-produccion', maturationController.getSublotesListosParaProduccion);
+router.get('/sublotes/lote/:id_lote_mp', maturationController.getSublotesByLote);
+router.get('/sublotes/:id', maturationController.getSubloteById);
+router.post('/sublotes/:id/fraccionar', maturationController.splitSublote);
+router.post('/sublotes/:id/cerrar', maturationController.closeSublote);
 
 router.get('/controles', maturationController.getControles);
-router.get('/controles/lote/:id_lote_mp', maturationController.getControlesByLote);
+router.get('/controles/sublote/:id_sublote', maturationController.getControlesBySublote);
 router.post('/controles', maturationController.createControl);
 router.delete('/controles/:id', maturationController.deleteControl);
+
+router.get('/redes-verdes/sublote/:id_sublote', maturationController.getRedesBySublote);
+router.post('/redes-verdes', maturationController.createRed);
 
 module.exports = router;

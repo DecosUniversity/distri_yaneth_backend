@@ -4,8 +4,8 @@ const findAll = async () => {
   return enqueueDbJob('maturationControls.findAll', {});
 };
 
-const findByLot = async (id_lote_mp) => {
-  return enqueueDbJob('maturationControls.findByLot', { id_lote_mp });
+const findBySublot = async (id_sublote) => {
+  return enqueueDbJob('maturationControls.findBySublot', { id_sublote });
 };
 
 const create = async (payload) => {
@@ -18,7 +18,7 @@ const remove = async (id) => {
 
 module.exports = {
   findAll,
-  findByLot,
+  findBySublot,
   create,
   remove,
 };

@@ -1,14 +1,13 @@
 const productModel = require('../models/product.model');
 const productionModel = require('../models/production.model');
-const maturationLotModel = require('../models/maturation_lot.model');
+const maturationSublotModel = require('../models/maturation_sublot.model');
 
 const parseId = (value) => Number.parseInt(value, 10);
 
 const PRODUCTION_STAGES = ['Pelado', 'Corte', 'Fritura', 'Embalaje'];
-const MERMA_CATEGORIES = ['Cascara', 'Punta', 'Cuaches', 'Coccion', 'Quemados', 'Otra'];
-const INPUT_TYPES = ['Aceite', 'Bolsas de empaque', 'Bolsas de basura', 'Otro'];
 const FINISHED_PRODUCT_TYPE = 'Producto Terminado';
-const LOT_READY_STATES = ['Completo'];
+const INSUMO_PRODUCT_TYPE = 'Insumo';
+const SUBLOT_READY_STATE = 'Listo para produccion';
 
 const formatDateTime = (value) => {
   if (!value) {
@@ -21,11 +20,11 @@ const formatDateTime = (value) => {
 const emptyToNull = (value) => (value === undefined || value === null || value === '' ? null : value);
 
 const BUSINESS_RULE_MESSAGES = [
-  'La cantidad ingresada supera el peso disponible del lote',
-  'El lote ya tiene un proceso de produccion activo',
+  'La cantidad ingresada supera el peso disponible del sub-lote',
   'El proceso ya fue finalizado',
   'La cantidad producida no es valida',
   'La cantidad producida no puede superar la cantidad ingresada',
+  'No hay suficiente inventario disponible para el insumo seleccionado',
 ];
 
 const handleProductionError = (error, res, next) => {
@@ -37,12 +36,12 @@ const handleProductionError = (error, res, next) => {
 };
 
 const validateProcessPayload = (payload) => {
-  const lotId = parseId(payload.id_lote_mp);
+  const sublotId = parseId(payload.id_sublote);
   const productId = parseId(payload.id_producto_resultado);
   const quantity = Number(payload.cantidad_ingresada_kg);
 
-  if (Number.isNaN(lotId) || lotId <= 0) {
-    return 'id_lote_mp es obligatorio y debe ser valido';
+  if (Number.isNaN(sublotId) || sublotId <= 0) {
+    return 'id_sublote es obligatorio y debe ser valido';
   }
 
   if (Number.isNaN(productId) || productId <= 0) {
@@ -90,11 +89,11 @@ const validateStagePayload = (payload) => {
 };
 
 const validateMermaPayload = (payload) => {
-  const category = String(payload.categoria_merma || '').trim();
+  const typeId = parseId(payload.id_tipo_merma);
   const quantity = Number(payload.cantidad_kg);
 
-  if (!MERMA_CATEGORIES.includes(category)) {
-    return `categoria_merma invalida. Valores permitidos: ${MERMA_CATEGORIES.join(', ')}`;
+  if (Number.isNaN(typeId) || typeId <= 0) {
+    return 'id_tipo_merma es obligatorio y debe ser valido';
   }
 
   if (Number.isNaN(quantity) || quantity <= 0) {
@@ -105,11 +104,11 @@ const validateMermaPayload = (payload) => {
 };
 
 const validateInsumoPayload = (payload) => {
-  const tipo = String(payload.tipo_insumo || '').trim();
+  const productId = parseId(payload.id_producto);
   const quantity = Number(payload.cantidad);
 
-  if (!INPUT_TYPES.includes(tipo)) {
-    return `tipo_insumo invalido. Valores permitidos: ${INPUT_TYPES.join(', ')}`;
+  if (Number.isNaN(productId) || productId <= 0) {
+    return 'id_producto es obligatorio y debe ser valido';
   }
 
   if (Number.isNaN(quantity) || quantity <= 0) {
@@ -197,7 +196,7 @@ const createProceso = async (req, res, next) => {
     }
 
     const payload = {
-      id_lote_mp: parseId(req.body.id_lote_mp),
+      id_sublote: parseId(req.body.id_sublote),
       id_producto_resultado: parseId(req.body.id_producto_resultado),
       cantidad_ingresada_kg: Number(req.body.cantidad_ingresada_kg),
       fecha_inicio: formatDateTime(req.body.fecha_inicio) || undefined,
@@ -207,14 +206,14 @@ const createProceso = async (req, res, next) => {
       id_usuario_registro: req.auth?.sub || null,
     };
 
-    const lot = await maturationLotModel.findById(payload.id_lote_mp);
-    if (!lot) {
-      return res.status(404).json({ message: 'Lote de materia prima no encontrado' });
+    const sublote = await maturationSublotModel.findById(payload.id_sublote);
+    if (!sublote) {
+      return res.status(404).json({ message: 'Sub-lote de materia prima no encontrado' });
     }
 
-    if (!LOT_READY_STATES.includes(String(lot.estado_registro || '').trim())) {
+    if (String(sublote.estado_registro || '').trim() !== SUBLOT_READY_STATE) {
       return res.status(400).json({
-        message: 'El lote debe estar en estado Completo (maduracion validada) para iniciar produccion',
+        message: 'El sub-lote debe estar Listo para produccion para iniciar un proceso',
       });
     }
 
@@ -285,7 +284,7 @@ const addMerma = async (req, res, next) => {
 
     const merma = await productionModel.addMerma(id, {
       id_etapa: emptyToNull(req.body.id_etapa) === null ? null : parseId(req.body.id_etapa),
-      categoria_merma: String(req.body.categoria_merma).trim(),
+      id_tipo_merma: parseId(req.body.id_tipo_merma),
       cantidad_kg: Number(req.body.cantidad_kg),
       observaciones: req.body.observaciones,
     });
@@ -314,9 +313,20 @@ const addInsumo = async (req, res, next) => {
       return res.status(400).json({ message: validationError });
     }
 
+    const idProducto = parseId(req.body.id_producto);
+    const product = await productModel.findById(idProducto);
+
+    if (!product) {
+      return res.status(404).json({ message: 'Insumo (producto) no encontrado' });
+    }
+
+    if (String(product.tipo_producto || '').trim() !== INSUMO_PRODUCT_TYPE) {
+      return res.status(400).json({ message: 'El producto seleccionado debe ser de tipo Insumo' });
+    }
+
     const insumo = await productionModel.addInsumo(id, {
       id_etapa: emptyToNull(req.body.id_etapa) === null ? null : parseId(req.body.id_etapa),
-      tipo_insumo: String(req.body.tipo_insumo).trim(),
+      id_producto: idProducto,
       cantidad: Number(req.body.cantidad),
       unidad_medida: String(req.body.unidad_medida).trim(),
       observaciones: req.body.observaciones,
@@ -328,7 +338,7 @@ const addInsumo = async (req, res, next) => {
 
     return res.status(201).json(insumo);
   } catch (error) {
-    return next(error);
+    return handleProductionError(error, res, next);
   }
 };
 
