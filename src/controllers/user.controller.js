@@ -14,6 +14,8 @@ const sanitizeUser = (user) => ({
   estado_registro: user.estado_registro,
   fecha_creacion: user.fecha_creacion,
   fecha_modificacion: user.fecha_modificacion,
+  id_usuario_modificacion: user.id_usuario_modificacion,
+  usuario_modificacion_nombre: user.usuario_modificacion_nombre,
 });
 
 const getUsers = async (_req, res, next) => {
@@ -67,6 +69,7 @@ const createUser = async (req, res, next) => {
       username,
       password_hash: hashedPassword,
       rol,
+      id_usuario_modificacion: req.auth?.sub ?? null,
     });
     return res.status(201).json(sanitizeUser(newUser));
   } catch (error) {
@@ -95,6 +98,7 @@ const updateUser = async (req, res, next) => {
       username,
       password_hash,
       rol,
+      id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
     if (!updatedUser) {
@@ -124,7 +128,7 @@ const resetUserPassword = async (req, res, next) => {
     }
 
     const hashedPassword = await bcrypt.hash(String(new_password), 10);
-    const updatedUser = await userModel.resetPassword(id, hashedPassword);
+    const updatedUser = await userModel.resetPassword(id, hashedPassword, req.auth?.sub ?? null);
 
     if (!updatedUser) {
       return res.status(404).json({ message: 'Usuario no encontrado' });
@@ -147,7 +151,7 @@ const deleteUser = async (req, res, next) => {
       return res.status(400).json({ message: 'ID invalido' });
     }
 
-    const deleted = await userModel.remove(id);
+    const deleted = await userModel.remove(id, req.auth?.sub ?? null);
 
     if (!deleted) {
       return res.status(404).json({ message: 'Usuario no encontrado' });

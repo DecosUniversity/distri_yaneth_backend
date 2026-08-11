@@ -42,8 +42,8 @@ const findUnitsByEntrada = async (id_entrada) => {
   return enqueueDbJob('entries.findUnitsByEntrada', { id_entrada });
 };
 
-const remove = async (id) => {
-  return enqueueDbJob('entries.remove', { id });
+const remove = async (id, id_usuario_modificacion) => {
+  return enqueueDbJob('entries.remove', { id, id_usuario_modificacion });
 };
 
 module.exports = {

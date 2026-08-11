@@ -44,28 +44,28 @@ const MATURATION_BRIX_THRESHOLD = Number(process.env.MATURATION_BRIX_THRESHOLD) 
 const normalizeNullableText = (value) => (value === undefined || value === null || value === '' ? null : value);
 
 const userQueries = {
-  findAll: `SELECT id_usuario, nombre_completo, username, password_hash, rol, estado_registro, fecha_modificacion FROM ${USERS_TABLE} WHERE estado_registro = '${ACTIVE_STATE}'`,
-  findById: `SELECT id_usuario, nombre_completo, username, password_hash, rol, estado_registro, fecha_modificacion FROM ${USERS_TABLE} WHERE id_usuario = ? AND estado_registro = '${ACTIVE_STATE}'`,
+  findAll: `SELECT u.id_usuario, u.nombre_completo, u.username, u.password_hash, u.rol, u.estado_registro, u.fecha_modificacion, u.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre FROM ${USERS_TABLE} u LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = u.id_usuario_modificacion WHERE u.estado_registro = '${ACTIVE_STATE}'`,
+  findById: `SELECT u.id_usuario, u.nombre_completo, u.username, u.password_hash, u.rol, u.estado_registro, u.fecha_modificacion, u.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre FROM ${USERS_TABLE} u LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = u.id_usuario_modificacion WHERE u.id_usuario = ? AND u.estado_registro = '${ACTIVE_STATE}'`,
   findByUsername: `SELECT id_usuario, nombre_completo, username, password_hash, rol, estado_registro, fecha_modificacion FROM ${USERS_TABLE} WHERE username = ? AND estado_registro = '${ACTIVE_STATE}' LIMIT 1`,
 };
 
 const providerQueries = {
-  findAll: `SELECT id_proveedor, nombre_empresa, nit, contacto_nombre, telefono, estado_registro, fecha_modificacion FROM ${PROVIDERS_TABLE} WHERE estado_registro = '${ACTIVE_STATE}'`,
-  findById: `SELECT id_proveedor, nombre_empresa, nit, contacto_nombre, telefono, estado_registro, fecha_modificacion FROM ${PROVIDERS_TABLE} WHERE id_proveedor = ? AND estado_registro = '${ACTIVE_STATE}'`,
+  findAll: `SELECT p.id_proveedor, p.nombre_empresa, p.nit, p.contacto_nombre, p.telefono, p.estado_registro, p.fecha_modificacion, p.id_usuario_modificacion, u.nombre_completo AS usuario_modificacion_nombre FROM ${PROVIDERS_TABLE} p LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = p.id_usuario_modificacion WHERE p.estado_registro = '${ACTIVE_STATE}'`,
+  findById: `SELECT p.id_proveedor, p.nombre_empresa, p.nit, p.contacto_nombre, p.telefono, p.estado_registro, p.fecha_modificacion, p.id_usuario_modificacion, u.nombre_completo AS usuario_modificacion_nombre FROM ${PROVIDERS_TABLE} p LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = p.id_usuario_modificacion WHERE p.id_proveedor = ? AND p.estado_registro = '${ACTIVE_STATE}'`,
 };
 
 const clientQueries = {
-  findAll: `SELECT id_cliente, nombre_comercial, direccion_entrega, telefono, nit_facturacion, estado_registro, fecha_modificacion FROM ${CLIENTS_TABLE} WHERE estado_registro = '${ACTIVE_STATE}'`,
-  findById: `SELECT id_cliente, nombre_comercial, direccion_entrega, telefono, nit_facturacion, estado_registro, fecha_modificacion FROM ${CLIENTS_TABLE} WHERE id_cliente = ? AND estado_registro = '${ACTIVE_STATE}'`,
+  findAll: `SELECT c.id_cliente, c.nombre_comercial, c.direccion_entrega, c.telefono, c.nit_facturacion, c.estado_registro, c.fecha_modificacion, c.id_usuario_modificacion, u.nombre_completo AS usuario_modificacion_nombre FROM ${CLIENTS_TABLE} c LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = c.id_usuario_modificacion WHERE c.estado_registro = '${ACTIVE_STATE}'`,
+  findById: `SELECT c.id_cliente, c.nombre_comercial, c.direccion_entrega, c.telefono, c.nit_facturacion, c.estado_registro, c.fecha_modificacion, c.id_usuario_modificacion, u.nombre_completo AS usuario_modificacion_nombre FROM ${CLIENTS_TABLE} c LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = c.id_usuario_modificacion WHERE c.id_cliente = ? AND c.estado_registro = '${ACTIVE_STATE}'`,
 };
 
 const entryQueries = {
-  findAll: `SELECT e.id_entrada, e.id_proveedor, p.nombre_empresa, e.fecha_recepcion, e.documento_referencia, e.costo_unitario, e.costo_total, e.id_usuario_receptor, u.nombre_completo AS receptor_nombre, e.estado_registro, e.fecha_modificacion, ie.id_existencia, ie.id_producto, pr.nombre AS producto_nombre, ie.fecha_vencimiento, m.cantidad AS cantidad_disponible FROM ${ENTRIES_TABLE} e LEFT JOIN ${PROVIDERS_TABLE} p ON p.id_proveedor = e.id_proveedor AND p.estado_registro = '${ACTIVE_STATE}' LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = e.id_usuario_receptor AND u.estado_registro = '${ACTIVE_STATE}' LEFT JOIN (SELECT mm.id_movimiento, mm.id_existencia, mm.cantidad, mm.motivo FROM ${MOVEMENTS_TABLE} mm INNER JOIN (SELECT motivo, MAX(id_movimiento) AS id_movimiento FROM ${MOVEMENTS_TABLE} WHERE tipo_movimiento = 'Entrada' AND estado_registro = '${ACTIVE_STATE}' GROUP BY motivo) latest ON latest.id_movimiento = mm.id_movimiento WHERE mm.estado_registro = '${ACTIVE_STATE}') m ON m.motivo = CONCAT('Entrada de mercancia #', e.id_entrada) LEFT JOIN ${INVENTORY_TABLE} ie ON ie.id_existencia = m.id_existencia AND ie.estado_registro = '${ACTIVE_STATE}' LEFT JOIN ${PRODUCTS_TABLE} pr ON pr.id_producto = ie.id_producto AND pr.estado_registro = '${ACTIVE_STATE}' WHERE e.estado_registro IN ('${PENDING_STATE}', '${ACTIVE_STATE}') ORDER BY e.fecha_recepcion DESC, e.id_entrada DESC`,
-  findById: `SELECT e.id_entrada, e.id_proveedor, p.nombre_empresa, e.fecha_recepcion, e.documento_referencia, e.costo_unitario, e.costo_total, e.id_usuario_receptor, u.nombre_completo AS receptor_nombre, e.estado_registro, e.fecha_modificacion, ie.id_existencia, ie.id_producto, pr.nombre AS producto_nombre, ie.fecha_vencimiento, m.cantidad AS cantidad_disponible FROM ${ENTRIES_TABLE} e LEFT JOIN ${PROVIDERS_TABLE} p ON p.id_proveedor = e.id_proveedor AND p.estado_registro = '${ACTIVE_STATE}' LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = e.id_usuario_receptor AND u.estado_registro = '${ACTIVE_STATE}' LEFT JOIN (SELECT mm.id_movimiento, mm.id_existencia, mm.cantidad, mm.motivo FROM ${MOVEMENTS_TABLE} mm INNER JOIN (SELECT motivo, MAX(id_movimiento) AS id_movimiento FROM ${MOVEMENTS_TABLE} WHERE tipo_movimiento = 'Entrada' AND estado_registro = '${ACTIVE_STATE}' GROUP BY motivo) latest ON latest.id_movimiento = mm.id_movimiento WHERE mm.estado_registro = '${ACTIVE_STATE}') m ON m.motivo = CONCAT('Entrada de mercancia #', e.id_entrada) LEFT JOIN ${INVENTORY_TABLE} ie ON ie.id_existencia = m.id_existencia AND ie.estado_registro = '${ACTIVE_STATE}' LEFT JOIN ${PRODUCTS_TABLE} pr ON pr.id_producto = ie.id_producto AND pr.estado_registro = '${ACTIVE_STATE}' WHERE e.id_entrada = ? AND e.estado_registro IN ('${PENDING_STATE}', '${ACTIVE_STATE}')`,
+  findAll: `SELECT e.id_entrada, e.id_proveedor, p.nombre_empresa, e.fecha_recepcion, e.documento_referencia, e.costo_unitario, e.costo_total, e.id_usuario_receptor, u.nombre_completo AS receptor_nombre, e.estado_registro, e.fecha_modificacion, e.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre, ie.id_existencia, ie.id_producto, pr.nombre AS producto_nombre, ie.fecha_vencimiento, m.cantidad AS cantidad_disponible FROM ${ENTRIES_TABLE} e LEFT JOIN ${PROVIDERS_TABLE} p ON p.id_proveedor = e.id_proveedor AND p.estado_registro = '${ACTIVE_STATE}' LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = e.id_usuario_receptor AND u.estado_registro = '${ACTIVE_STATE}' LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = e.id_usuario_modificacion LEFT JOIN (SELECT mm.id_movimiento, mm.id_existencia, mm.cantidad, mm.motivo FROM ${MOVEMENTS_TABLE} mm INNER JOIN (SELECT motivo, MAX(id_movimiento) AS id_movimiento FROM ${MOVEMENTS_TABLE} WHERE tipo_movimiento = 'Entrada' AND estado_registro = '${ACTIVE_STATE}' GROUP BY motivo) latest ON latest.id_movimiento = mm.id_movimiento WHERE mm.estado_registro = '${ACTIVE_STATE}') m ON m.motivo = CONCAT('Entrada de mercancia #', e.id_entrada) LEFT JOIN ${INVENTORY_TABLE} ie ON ie.id_existencia = m.id_existencia AND ie.estado_registro = '${ACTIVE_STATE}' LEFT JOIN ${PRODUCTS_TABLE} pr ON pr.id_producto = ie.id_producto AND pr.estado_registro = '${ACTIVE_STATE}' WHERE e.estado_registro IN ('${PENDING_STATE}', '${ACTIVE_STATE}') ORDER BY e.fecha_recepcion DESC, e.id_entrada DESC`,
+  findById: `SELECT e.id_entrada, e.id_proveedor, p.nombre_empresa, e.fecha_recepcion, e.documento_referencia, e.costo_unitario, e.costo_total, e.id_usuario_receptor, u.nombre_completo AS receptor_nombre, e.estado_registro, e.fecha_modificacion, e.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre, ie.id_existencia, ie.id_producto, pr.nombre AS producto_nombre, ie.fecha_vencimiento, m.cantidad AS cantidad_disponible FROM ${ENTRIES_TABLE} e LEFT JOIN ${PROVIDERS_TABLE} p ON p.id_proveedor = e.id_proveedor AND p.estado_registro = '${ACTIVE_STATE}' LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = e.id_usuario_receptor AND u.estado_registro = '${ACTIVE_STATE}' LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = e.id_usuario_modificacion LEFT JOIN (SELECT mm.id_movimiento, mm.id_existencia, mm.cantidad, mm.motivo FROM ${MOVEMENTS_TABLE} mm INNER JOIN (SELECT motivo, MAX(id_movimiento) AS id_movimiento FROM ${MOVEMENTS_TABLE} WHERE tipo_movimiento = 'Entrada' AND estado_registro = '${ACTIVE_STATE}' GROUP BY motivo) latest ON latest.id_movimiento = mm.id_movimiento WHERE mm.estado_registro = '${ACTIVE_STATE}') m ON m.motivo = CONCAT('Entrada de mercancia #', e.id_entrada) LEFT JOIN ${INVENTORY_TABLE} ie ON ie.id_existencia = m.id_existencia AND ie.estado_registro = '${ACTIVE_STATE}' LEFT JOIN ${PRODUCTS_TABLE} pr ON pr.id_producto = ie.id_producto AND pr.estado_registro = '${ACTIVE_STATE}' WHERE e.id_entrada = ? AND e.estado_registro IN ('${PENDING_STATE}', '${ACTIVE_STATE}')`,
 };
 
 const inventoryQueries = {
-  findAll: `SELECT base.id_existencia, base.id_producto, base.producto_nombre, base.tipo_producto, base.id_proveedor, base.nombre_empresa, base.id_proceso_origen, base.id_entrada_origen, base.fecha_entrada, base.fecha_vencimiento, base.cantidad_disponible, base.costo_unitario, base.estado_registro, base.fecha_modificacion, base.id_lote_mp, base.peso_inicial_kg FROM (SELECT ie.id_existencia, ie.id_producto, pr.nombre AS producto_nombre, pr.tipo_producto AS tipo_producto, ie.id_proveedor, p.nombre_empresa, ie.id_proceso_origen, ie.id_entrada_origen, ie.fecha_entrada, ie.fecha_vencimiento, COALESCE(stock.cantidad_disponible, ie.cantidad_disponible, 0) AS cantidad_disponible, ie.costo_unitario, ie.estado_registro, ie.fecha_modificacion, NULL AS id_lote_mp, NULL AS peso_inicial_kg FROM ${INVENTORY_TABLE} ie LEFT JOIN ${PRODUCTS_TABLE} pr ON pr.id_producto = ie.id_producto AND pr.estado_registro = '${ACTIVE_STATE}' LEFT JOIN ${PROVIDERS_TABLE} p ON p.id_proveedor = ie.id_proveedor AND p.estado_registro = '${ACTIVE_STATE}' LEFT JOIN (SELECT id_existencia, SUM(CASE WHEN tipo_movimiento = 'Entrada' THEN cantidad WHEN tipo_movimiento IN ('Salida', 'Ajuste', 'Desperdicio') THEN -cantidad ELSE 0 END) AS cantidad_disponible FROM ${MOVEMENTS_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' GROUP BY id_existencia) stock ON stock.id_existencia = ie.id_existencia WHERE ie.estado_registro = '${ACTIVE_STATE}' UNION ALL SELECT NULL AS id_existencia, l.id_producto, pr.nombre AS producto_nombre, 'Fruta para produccion' AS tipo_producto, NULL AS id_proveedor, NULL AS nombre_empresa, NULL AS id_proceso_origen, l.id_entrada_origen, l.fecha_recepcion AS fecha_entrada, NULL AS fecha_vencimiento, COALESCE(sub.peso_disponible, 0) AS cantidad_disponible, NULL AS costo_unitario, '${COMPLETE_STATE}' AS estado_registro, sub.fecha_modificacion, l.id_lote_mp, l.peso_inicial_kg FROM ${RAW_MATERIAL_LOTS_TABLE} l INNER JOIN (SELECT id_lote_mp, SUM(peso_kg) AS peso_disponible, MAX(fecha_modificacion) AS fecha_modificacion FROM ${MATURATION_SUBLOT_TABLE} GROUP BY id_lote_mp) sub ON sub.id_lote_mp = l.id_lote_mp LEFT JOIN ${PRODUCTS_TABLE} pr ON pr.id_producto = l.id_producto AND pr.estado_registro = '${ACTIVE_STATE}') base ORDER BY base.fecha_entrada DESC, base.id_existencia DESC, base.id_entrada_origen DESC`,
+  findAll: `SELECT base.id_existencia, base.id_producto, base.producto_nombre, base.tipo_producto, base.id_proveedor, base.nombre_empresa, base.id_proceso_origen, base.id_entrada_origen, base.fecha_entrada, base.fecha_vencimiento, base.cantidad_disponible, base.costo_unitario, base.estado_registro, base.fecha_modificacion, base.id_lote_mp, base.peso_inicial_kg, base.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre FROM (SELECT ie.id_existencia, ie.id_producto, pr.nombre AS producto_nombre, pr.tipo_producto AS tipo_producto, ie.id_proveedor, p.nombre_empresa, ie.id_proceso_origen, ie.id_entrada_origen, ie.fecha_entrada, ie.fecha_vencimiento, COALESCE(stock.cantidad_disponible, ie.cantidad_disponible, 0) AS cantidad_disponible, ie.costo_unitario, ie.estado_registro, ie.fecha_modificacion, NULL AS id_lote_mp, NULL AS peso_inicial_kg, ie.id_usuario_modificacion FROM ${INVENTORY_TABLE} ie LEFT JOIN ${PRODUCTS_TABLE} pr ON pr.id_producto = ie.id_producto AND pr.estado_registro = '${ACTIVE_STATE}' LEFT JOIN ${PROVIDERS_TABLE} p ON p.id_proveedor = ie.id_proveedor AND p.estado_registro = '${ACTIVE_STATE}' LEFT JOIN (SELECT id_existencia, SUM(CASE WHEN tipo_movimiento = 'Entrada' THEN cantidad WHEN tipo_movimiento IN ('Salida', 'Ajuste', 'Desperdicio') THEN -cantidad ELSE 0 END) AS cantidad_disponible FROM ${MOVEMENTS_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' GROUP BY id_existencia) stock ON stock.id_existencia = ie.id_existencia WHERE ie.estado_registro = '${ACTIVE_STATE}' UNION ALL SELECT NULL AS id_existencia, l.id_producto, pr.nombre AS producto_nombre, 'Fruta para produccion' AS tipo_producto, NULL AS id_proveedor, NULL AS nombre_empresa, NULL AS id_proceso_origen, l.id_entrada_origen, l.fecha_recepcion AS fecha_entrada, NULL AS fecha_vencimiento, COALESCE(sub.peso_disponible, 0) AS cantidad_disponible, NULL AS costo_unitario, '${COMPLETE_STATE}' AS estado_registro, sub.fecha_modificacion, l.id_lote_mp, l.peso_inicial_kg, l.id_usuario_modificacion FROM ${RAW_MATERIAL_LOTS_TABLE} l INNER JOIN (SELECT id_lote_mp, SUM(peso_kg) AS peso_disponible, MAX(fecha_modificacion) AS fecha_modificacion FROM ${MATURATION_SUBLOT_TABLE} GROUP BY id_lote_mp) sub ON sub.id_lote_mp = l.id_lote_mp LEFT JOIN ${PRODUCTS_TABLE} pr ON pr.id_producto = l.id_producto AND pr.estado_registro = '${ACTIVE_STATE}') base LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = base.id_usuario_modificacion ORDER BY base.fecha_entrada DESC, base.id_existencia DESC, base.id_entrada_origen DESC`,
 };
 
 const movementQueries = {
@@ -73,13 +73,13 @@ const movementQueries = {
 };
 
 const productQueries = {
-  findAll: `SELECT id_producto, nombre, descripcion, unidad_medida, tipo_producto, stock_minimo, precio_venta_sugerido, estado_registro, fecha_modificacion FROM ${PRODUCTS_TABLE} WHERE estado_registro = '${ACTIVE_STATE}'`,
-  findById: `SELECT id_producto, nombre, descripcion, unidad_medida, tipo_producto, stock_minimo, precio_venta_sugerido, estado_registro, fecha_modificacion FROM ${PRODUCTS_TABLE} WHERE id_producto = ? AND estado_registro = '${ACTIVE_STATE}'`,
+  findAll: `SELECT p.id_producto, p.nombre, p.descripcion, p.unidad_medida, p.tipo_producto, p.stock_minimo, p.precio_venta_sugerido, p.estado_registro, p.fecha_modificacion, p.id_usuario_modificacion, u.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTS_TABLE} p LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = p.id_usuario_modificacion WHERE p.estado_registro = '${ACTIVE_STATE}'`,
+  findById: `SELECT p.id_producto, p.nombre, p.descripcion, p.unidad_medida, p.tipo_producto, p.stock_minimo, p.precio_venta_sugerido, p.estado_registro, p.fecha_modificacion, p.id_usuario_modificacion, u.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTS_TABLE} p LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = p.id_usuario_modificacion WHERE p.id_producto = ? AND p.estado_registro = '${ACTIVE_STATE}'`,
 };
 
 const serviceTypeQueries = {
-  findAll: `SELECT id_tipo_servicio, nombre_servicio, descripcion, km_frecuencia FROM ${SERVICE_TYPES_TABLE} ORDER BY nombre_servicio ASC, id_tipo_servicio ASC`,
-  findById: `SELECT id_tipo_servicio, nombre_servicio, descripcion, km_frecuencia FROM ${SERVICE_TYPES_TABLE} WHERE id_tipo_servicio = ?`,
+  findAll: `SELECT s.id_tipo_servicio, s.nombre_servicio, s.descripcion, s.km_frecuencia, s.fecha_modificacion, s.id_usuario_modificacion, u.nombre_completo AS usuario_modificacion_nombre FROM ${SERVICE_TYPES_TABLE} s LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = s.id_usuario_modificacion ORDER BY s.nombre_servicio ASC, s.id_tipo_servicio ASC`,
+  findById: `SELECT s.id_tipo_servicio, s.nombre_servicio, s.descripcion, s.km_frecuencia, s.fecha_modificacion, s.id_usuario_modificacion, u.nombre_completo AS usuario_modificacion_nombre FROM ${SERVICE_TYPES_TABLE} s LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = s.id_usuario_modificacion WHERE s.id_tipo_servicio = ?`,
 };
 
 const mermaTypeQueries = {
@@ -87,12 +87,12 @@ const mermaTypeQueries = {
 };
 
 const maturationLotQueries = {
-  findAll: `SELECT l.id_lote_mp, l.id_producto, p.nombre AS producto_nombre, l.id_proveedor, pr.nombre_empresa AS proveedor_nombre, l.id_entrada_origen, l.fecha_recepcion, l.cantidad_unidades, l.peso_inicial_kg, COALESCE(sub.peso_disponible_kg, 0) AS peso_disponible_kg, l.estado_maduracion, l.estado_registro FROM ${RAW_MATERIAL_LOTS_TABLE} l LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = l.id_producto LEFT JOIN ${PROVIDERS_TABLE} pr ON pr.id_proveedor = l.id_proveedor LEFT JOIN (SELECT id_lote_mp, SUM(peso_kg) AS peso_disponible_kg FROM ${MATURATION_SUBLOT_TABLE} GROUP BY id_lote_mp) sub ON sub.id_lote_mp = l.id_lote_mp WHERE l.estado_registro <> '${INACTIVE_STATE}' ORDER BY l.fecha_recepcion DESC, l.id_lote_mp DESC`,
-  findById: `SELECT l.id_lote_mp, l.id_producto, p.nombre AS producto_nombre, l.id_proveedor, pr.nombre_empresa AS proveedor_nombre, l.id_entrada_origen, l.fecha_recepcion, l.cantidad_unidades, l.peso_inicial_kg, COALESCE(sub.peso_disponible_kg, 0) AS peso_disponible_kg, l.estado_maduracion, l.estado_registro FROM ${RAW_MATERIAL_LOTS_TABLE} l LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = l.id_producto LEFT JOIN ${PROVIDERS_TABLE} pr ON pr.id_proveedor = l.id_proveedor LEFT JOIN (SELECT id_lote_mp, SUM(peso_kg) AS peso_disponible_kg FROM ${MATURATION_SUBLOT_TABLE} GROUP BY id_lote_mp) sub ON sub.id_lote_mp = l.id_lote_mp WHERE l.id_lote_mp = ? AND l.estado_registro <> '${INACTIVE_STATE}'`,
+  findAll: `SELECT l.id_lote_mp, l.id_producto, p.nombre AS producto_nombre, l.id_proveedor, pr.nombre_empresa AS proveedor_nombre, l.id_entrada_origen, l.fecha_recepcion, l.cantidad_unidades, l.peso_inicial_kg, COALESCE(sub.peso_disponible_kg, 0) AS peso_disponible_kg, l.estado_maduracion, l.estado_registro, l.fecha_modificacion, l.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre FROM ${RAW_MATERIAL_LOTS_TABLE} l LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = l.id_producto LEFT JOIN ${PROVIDERS_TABLE} pr ON pr.id_proveedor = l.id_proveedor LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = l.id_usuario_modificacion LEFT JOIN (SELECT id_lote_mp, SUM(peso_kg) AS peso_disponible_kg FROM ${MATURATION_SUBLOT_TABLE} GROUP BY id_lote_mp) sub ON sub.id_lote_mp = l.id_lote_mp WHERE l.estado_registro <> '${INACTIVE_STATE}' ORDER BY l.fecha_recepcion DESC, l.id_lote_mp DESC`,
+  findById: `SELECT l.id_lote_mp, l.id_producto, p.nombre AS producto_nombre, l.id_proveedor, pr.nombre_empresa AS proveedor_nombre, l.id_entrada_origen, l.fecha_recepcion, l.cantidad_unidades, l.peso_inicial_kg, COALESCE(sub.peso_disponible_kg, 0) AS peso_disponible_kg, l.estado_maduracion, l.estado_registro, l.fecha_modificacion, l.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre FROM ${RAW_MATERIAL_LOTS_TABLE} l LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = l.id_producto LEFT JOIN ${PROVIDERS_TABLE} pr ON pr.id_proveedor = l.id_proveedor LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = l.id_usuario_modificacion LEFT JOIN (SELECT id_lote_mp, SUM(peso_kg) AS peso_disponible_kg FROM ${MATURATION_SUBLOT_TABLE} GROUP BY id_lote_mp) sub ON sub.id_lote_mp = l.id_lote_mp WHERE l.id_lote_mp = ? AND l.estado_registro <> '${INACTIVE_STATE}'`,
   findForUpdate: `SELECT id_lote_mp, id_producto, id_proveedor, peso_inicial_kg, cantidad_unidades, estado_maduracion, estado_registro FROM ${RAW_MATERIAL_LOTS_TABLE} WHERE id_lote_mp = ? AND estado_registro <> '${INACTIVE_STATE}' FOR UPDATE`,
 };
 
-const maturationSublotBaseQuery = `SELECT s.id_sublote, s.id_lote_mp, s.codigo_sublote, s.peso_inicial_kg, s.peso_kg, s.peso_neto_maduracion_kg, s.perdida_maduracion_kg, s.cantidad_unidades, s.estado_maduracion, s.estado_registro, s.observaciones, s.fecha_creacion, s.fecha_modificacion, l.id_producto, p.nombre AS producto_nombre, l.id_proveedor, pr.nombre_empresa AS proveedor_nombre FROM ${MATURATION_SUBLOT_TABLE} s LEFT JOIN ${RAW_MATERIAL_LOTS_TABLE} l ON l.id_lote_mp = s.id_lote_mp LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = l.id_producto LEFT JOIN ${PROVIDERS_TABLE} pr ON pr.id_proveedor = l.id_proveedor`;
+const maturationSublotBaseQuery = `SELECT s.id_sublote, s.id_lote_mp, s.codigo_sublote, s.peso_inicial_kg, s.peso_kg, s.peso_neto_maduracion_kg, s.perdida_maduracion_kg, s.cantidad_unidades, s.estado_maduracion, s.estado_registro, s.observaciones, s.fecha_creacion, s.fecha_modificacion, s.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre, l.id_producto, p.nombre AS producto_nombre, l.id_proveedor, pr.nombre_empresa AS proveedor_nombre FROM ${MATURATION_SUBLOT_TABLE} s LEFT JOIN ${RAW_MATERIAL_LOTS_TABLE} l ON l.id_lote_mp = s.id_lote_mp LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = l.id_producto LEFT JOIN ${PROVIDERS_TABLE} pr ON pr.id_proveedor = l.id_proveedor LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = s.id_usuario_modificacion`;
 
 const maturationSublotQueries = {
   findAll: `${maturationSublotBaseQuery} WHERE s.estado_registro <> '${INACTIVE_STATE}' ORDER BY s.fecha_creacion DESC, s.id_sublote DESC`,
@@ -104,7 +104,7 @@ const maturationSublotQueries = {
   latestMeasuredWeight: `SELECT peso_medido_kg FROM ${MATURATION_CONTROL_TABLE} WHERE id_sublote = ? AND peso_medido_kg IS NOT NULL ORDER BY fecha_medicion DESC, id_control DESC LIMIT 1`,
 };
 
-const maturationControlBaseQuery = `SELECT c.id_control, c.id_sublote, c.fecha_medicion, c.grados_brix, c.peso_medido_kg, c.porcentaje_materia_seca, c.temperatura_cuarto, c.observaciones, s.codigo_sublote, s.id_lote_mp, s.estado_maduracion, s.estado_registro AS sublote_estado_registro, l.id_producto, p.nombre AS producto_nombre, l.id_proveedor, pr.nombre_empresa AS proveedor_nombre FROM ${MATURATION_CONTROL_TABLE} c LEFT JOIN ${MATURATION_SUBLOT_TABLE} s ON s.id_sublote = c.id_sublote LEFT JOIN ${RAW_MATERIAL_LOTS_TABLE} l ON l.id_lote_mp = s.id_lote_mp LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = l.id_producto LEFT JOIN ${PROVIDERS_TABLE} pr ON pr.id_proveedor = l.id_proveedor`;
+const maturationControlBaseQuery = `SELECT c.id_control, c.id_sublote, c.fecha_medicion, c.grados_brix, c.peso_medido_kg, c.porcentaje_materia_seca, c.temperatura_cuarto, c.observaciones, c.fecha_modificacion, c.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre, s.codigo_sublote, s.id_lote_mp, s.estado_maduracion, s.estado_registro AS sublote_estado_registro, l.id_producto, p.nombre AS producto_nombre, l.id_proveedor, pr.nombre_empresa AS proveedor_nombre FROM ${MATURATION_CONTROL_TABLE} c LEFT JOIN ${MATURATION_SUBLOT_TABLE} s ON s.id_sublote = c.id_sublote LEFT JOIN ${RAW_MATERIAL_LOTS_TABLE} l ON l.id_lote_mp = s.id_lote_mp LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = l.id_producto LEFT JOIN ${PROVIDERS_TABLE} pr ON pr.id_proveedor = l.id_proveedor LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = c.id_usuario_modificacion`;
 
 const maturationControlQueries = {
   findAll: `${maturationControlBaseQuery} ORDER BY c.fecha_medicion DESC, c.id_control DESC`,
@@ -119,28 +119,28 @@ const greenNetQueries = {
   findBySublot: `${greenNetBaseQuery} WHERE r.id_sublote = ? ORDER BY r.fecha_empaque DESC, r.id_red DESC`,
 };
 
-const productionProcessBaseQuery = `SELECT p.id_proceso, p.id_sublote, p.id_producto_resultado, p.cantidad_ingresada_kg, p.cantidad_producida_kg, p.rendimiento_porcentaje, p.estado_proceso, p.fecha_inicio, p.fecha_fin, p.cuarto_congelado, p.ubicacion_cuarto_congelado, p.observaciones, p.id_usuario_registro, u.nombre_completo AS usuario_nombre, s.codigo_sublote, s.peso_kg AS sublote_peso_disponible, s.peso_neto_maduracion_kg, s.estado_maduracion, l.id_lote_mp, l.id_proveedor AS id_proveedor_origen, l.id_entrada_origen AS id_entrada_origen, l.id_producto AS id_producto_origen, lp.nombre AS lote_producto_nombre, pr.nombre AS producto_resultado_nombre, pr.unidad_medida AS producto_resultado_unidad FROM ${PRODUCTION_TABLE} p LEFT JOIN ${MATURATION_SUBLOT_TABLE} s ON s.id_sublote = p.id_sublote LEFT JOIN ${RAW_MATERIAL_LOTS_TABLE} l ON l.id_lote_mp = s.id_lote_mp LEFT JOIN ${PRODUCTS_TABLE} lp ON lp.id_producto = l.id_producto LEFT JOIN ${PRODUCTS_TABLE} pr ON pr.id_producto = p.id_producto_resultado LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = p.id_usuario_registro WHERE p.estado_registro <> '${INACTIVE_STATE}'`;
+const productionProcessBaseQuery = `SELECT p.id_proceso, p.id_sublote, p.id_producto_resultado, p.cantidad_ingresada_kg, p.cantidad_producida_kg, p.rendimiento_porcentaje, p.estado_proceso, p.fecha_inicio, p.fecha_fin, p.cuarto_congelado, p.ubicacion_cuarto_congelado, p.observaciones, p.id_usuario_registro, u.nombre_completo AS usuario_nombre, p.fecha_modificacion, p.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre, s.codigo_sublote, s.peso_kg AS sublote_peso_disponible, s.peso_neto_maduracion_kg, s.estado_maduracion, l.id_lote_mp, l.id_proveedor AS id_proveedor_origen, l.id_entrada_origen AS id_entrada_origen, l.id_producto AS id_producto_origen, lp.nombre AS lote_producto_nombre, pr.nombre AS producto_resultado_nombre, pr.unidad_medida AS producto_resultado_unidad FROM ${PRODUCTION_TABLE} p LEFT JOIN ${MATURATION_SUBLOT_TABLE} s ON s.id_sublote = p.id_sublote LEFT JOIN ${RAW_MATERIAL_LOTS_TABLE} l ON l.id_lote_mp = s.id_lote_mp LEFT JOIN ${PRODUCTS_TABLE} lp ON lp.id_producto = l.id_producto LEFT JOIN ${PRODUCTS_TABLE} pr ON pr.id_producto = p.id_producto_resultado LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = p.id_usuario_registro LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = p.id_usuario_modificacion WHERE p.estado_registro <> '${INACTIVE_STATE}'`;
 
 const productionProcessListQuery = `SELECT base.*, COALESCE(etapas.total_etapas, 0) AS total_etapas, COALESCE(etapas.etapa_actual, '-') AS etapa_actual, COALESCE(mermas.total_merma_kg, 0) AS total_merma_kg, COALESCE(insumos.total_insumos, 0) AS total_insumos, COALESCE(cuartos.total_cuartos, 0) AS total_cuartos FROM (${productionProcessBaseQuery}) base LEFT JOIN (SELECT id_proceso, COUNT(*) AS total_etapas, MAX(nombre_etapa) AS etapa_actual FROM ${PRODUCTION_STAGE_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' GROUP BY id_proceso) etapas ON etapas.id_proceso = base.id_proceso LEFT JOIN (SELECT id_proceso, SUM(cantidad_kg) AS total_merma_kg FROM ${PRODUCTION_MERMA_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' GROUP BY id_proceso) mermas ON mermas.id_proceso = base.id_proceso LEFT JOIN (SELECT id_proceso, COUNT(*) AS total_insumos FROM ${PRODUCTION_INSUMO_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' GROUP BY id_proceso) insumos ON insumos.id_proceso = base.id_proceso LEFT JOIN (SELECT id_proceso, COUNT(*) AS total_cuartos FROM ${PRODUCTION_COLD_ROOM_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' GROUP BY id_proceso) cuartos ON cuartos.id_proceso = base.id_proceso ORDER BY base.fecha_inicio DESC, base.id_proceso DESC`;
 
 const productionStageQueries = {
-  findByProcess: `SELECT id_etapa, id_proceso, nombre_etapa, cantidad_personas, personal_asignado, fecha_inicio, fecha_fin, cantidad_entrada_kg, cantidad_salida_kg, merma_kg, observaciones, estado_registro, fecha_creacion, fecha_modificacion FROM ${PRODUCTION_STAGE_TABLE} WHERE id_proceso = ? AND estado_registro = '${ACTIVE_STATE}' ORDER BY fecha_inicio ASC, id_etapa ASC`,
-  findById: `SELECT id_etapa, id_proceso, nombre_etapa, cantidad_personas, personal_asignado, fecha_inicio, fecha_fin, cantidad_entrada_kg, cantidad_salida_kg, merma_kg, observaciones, estado_registro, fecha_creacion, fecha_modificacion FROM ${PRODUCTION_STAGE_TABLE} WHERE id_etapa = ?`,
+  findByProcess: `SELECT e.id_etapa, e.id_proceso, e.nombre_etapa, e.cantidad_personas, e.personal_asignado, e.fecha_inicio, e.fecha_fin, e.cantidad_entrada_kg, e.cantidad_salida_kg, e.merma_kg, e.observaciones, e.estado_registro, e.fecha_creacion, e.fecha_modificacion, e.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTION_STAGE_TABLE} e LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = e.id_usuario_modificacion WHERE e.id_proceso = ? AND e.estado_registro = '${ACTIVE_STATE}' ORDER BY e.fecha_inicio ASC, e.id_etapa ASC`,
+  findById: `SELECT e.id_etapa, e.id_proceso, e.nombre_etapa, e.cantidad_personas, e.personal_asignado, e.fecha_inicio, e.fecha_fin, e.cantidad_entrada_kg, e.cantidad_salida_kg, e.merma_kg, e.observaciones, e.estado_registro, e.fecha_creacion, e.fecha_modificacion, e.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTION_STAGE_TABLE} e LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = e.id_usuario_modificacion WHERE e.id_etapa = ?`,
 };
 
 const productionMermaQueries = {
-  findByProcess: `SELECT m.id_merma, m.id_proceso, m.id_etapa, m.id_tipo_merma, ctm.nombre_merma, m.cantidad_kg, m.observaciones, m.fecha_registro, m.estado_registro, m.fecha_creacion, m.fecha_modificacion FROM ${PRODUCTION_MERMA_TABLE} m LEFT JOIN ${CAT_MERMA_TABLE} ctm ON ctm.id_tipo_merma = m.id_tipo_merma WHERE m.id_proceso = ? AND m.estado_registro = '${ACTIVE_STATE}' ORDER BY m.fecha_registro DESC, m.id_merma DESC`,
-  findById: `SELECT m.id_merma, m.id_proceso, m.id_etapa, m.id_tipo_merma, ctm.nombre_merma, m.cantidad_kg, m.observaciones, m.fecha_registro, m.estado_registro, m.fecha_creacion, m.fecha_modificacion FROM ${PRODUCTION_MERMA_TABLE} m LEFT JOIN ${CAT_MERMA_TABLE} ctm ON ctm.id_tipo_merma = m.id_tipo_merma WHERE m.id_merma = ?`,
+  findByProcess: `SELECT m.id_merma, m.id_proceso, m.id_etapa, m.id_tipo_merma, ctm.nombre_merma, m.cantidad_kg, m.observaciones, m.fecha_registro, m.estado_registro, m.fecha_creacion, m.fecha_modificacion, m.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTION_MERMA_TABLE} m LEFT JOIN ${CAT_MERMA_TABLE} ctm ON ctm.id_tipo_merma = m.id_tipo_merma LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = m.id_usuario_modificacion WHERE m.id_proceso = ? AND m.estado_registro = '${ACTIVE_STATE}' ORDER BY m.fecha_registro DESC, m.id_merma DESC`,
+  findById: `SELECT m.id_merma, m.id_proceso, m.id_etapa, m.id_tipo_merma, ctm.nombre_merma, m.cantidad_kg, m.observaciones, m.fecha_registro, m.estado_registro, m.fecha_creacion, m.fecha_modificacion, m.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTION_MERMA_TABLE} m LEFT JOIN ${CAT_MERMA_TABLE} ctm ON ctm.id_tipo_merma = m.id_tipo_merma LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = m.id_usuario_modificacion WHERE m.id_merma = ?`,
 };
 
 const productionInsumoQueries = {
-  findByProcess: `SELECT i.id_consumo, i.id_proceso, i.id_etapa, i.id_producto, prd.nombre AS producto_nombre, i.cantidad, i.unidad_medida, i.observaciones, i.fecha_registro, i.estado_registro, i.fecha_creacion, i.fecha_modificacion FROM ${PRODUCTION_INSUMO_TABLE} i LEFT JOIN ${PRODUCTS_TABLE} prd ON prd.id_producto = i.id_producto WHERE i.id_proceso = ? AND i.estado_registro = '${ACTIVE_STATE}' ORDER BY i.fecha_registro DESC, i.id_consumo DESC`,
-  findById: `SELECT i.id_consumo, i.id_proceso, i.id_etapa, i.id_producto, prd.nombre AS producto_nombre, i.cantidad, i.unidad_medida, i.observaciones, i.fecha_registro, i.estado_registro, i.fecha_creacion, i.fecha_modificacion FROM ${PRODUCTION_INSUMO_TABLE} i LEFT JOIN ${PRODUCTS_TABLE} prd ON prd.id_producto = i.id_producto WHERE i.id_consumo = ?`,
+  findByProcess: `SELECT i.id_consumo, i.id_proceso, i.id_etapa, i.id_producto, prd.nombre AS producto_nombre, i.cantidad, i.unidad_medida, i.observaciones, i.fecha_registro, i.estado_registro, i.fecha_creacion, i.fecha_modificacion, i.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTION_INSUMO_TABLE} i LEFT JOIN ${PRODUCTS_TABLE} prd ON prd.id_producto = i.id_producto LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = i.id_usuario_modificacion WHERE i.id_proceso = ? AND i.estado_registro = '${ACTIVE_STATE}' ORDER BY i.fecha_registro DESC, i.id_consumo DESC`,
+  findById: `SELECT i.id_consumo, i.id_proceso, i.id_etapa, i.id_producto, prd.nombre AS producto_nombre, i.cantidad, i.unidad_medida, i.observaciones, i.fecha_registro, i.estado_registro, i.fecha_creacion, i.fecha_modificacion, i.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTION_INSUMO_TABLE} i LEFT JOIN ${PRODUCTS_TABLE} prd ON prd.id_producto = i.id_producto LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = i.id_usuario_modificacion WHERE i.id_consumo = ?`,
 };
 
 const productionColdRoomQueries = {
-  findByProcess: `SELECT id_ingreso_cuarto, id_proceso, fecha_ingreso, ubicacion_cuarto, cantidad_kg, observaciones, estado_registro, fecha_creacion, fecha_modificacion FROM ${PRODUCTION_COLD_ROOM_TABLE} WHERE id_proceso = ? AND estado_registro = '${ACTIVE_STATE}' ORDER BY fecha_ingreso DESC, id_ingreso_cuarto DESC`,
-  findById: `SELECT id_ingreso_cuarto, id_proceso, fecha_ingreso, ubicacion_cuarto, cantidad_kg, observaciones, estado_registro, fecha_creacion, fecha_modificacion FROM ${PRODUCTION_COLD_ROOM_TABLE} WHERE id_ingreso_cuarto = ?`,
+  findByProcess: `SELECT c.id_ingreso_cuarto, c.id_proceso, c.fecha_ingreso, c.ubicacion_cuarto, c.cantidad_kg, c.observaciones, c.estado_registro, c.fecha_creacion, c.fecha_modificacion, c.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTION_COLD_ROOM_TABLE} c LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = c.id_usuario_modificacion WHERE c.id_proceso = ? AND c.estado_registro = '${ACTIVE_STATE}' ORDER BY c.fecha_ingreso DESC, c.id_ingreso_cuarto DESC`,
+  findById: `SELECT c.id_ingreso_cuarto, c.id_proceso, c.fecha_ingreso, c.ubicacion_cuarto, c.cantidad_kg, c.observaciones, c.estado_registro, c.fecha_creacion, c.fecha_modificacion, c.id_usuario_modificacion, mod.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTION_COLD_ROOM_TABLE} c LEFT JOIN ${USERS_TABLE} mod ON mod.id_usuario = c.id_usuario_modificacion WHERE c.id_ingreso_cuarto = ?`,
 };
 
 const productionProcessQueries = {
@@ -149,7 +149,7 @@ const productionProcessQueries = {
   findInsumoExistencia: `SELECT ie.id_existencia, COALESCE(stock.cantidad_disponible, 0) AS cantidad_disponible FROM ${INVENTORY_TABLE} ie LEFT JOIN (SELECT id_existencia, SUM(CASE WHEN tipo_movimiento = 'Entrada' THEN cantidad WHEN tipo_movimiento IN ('Salida', 'Ajuste', 'Desperdicio') THEN -cantidad ELSE 0 END) AS cantidad_disponible FROM ${MOVEMENTS_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' GROUP BY id_existencia) stock ON stock.id_existencia = ie.id_existencia WHERE ie.id_producto = ? AND ie.estado_registro = '${ACTIVE_STATE}' ORDER BY ie.fecha_vencimiento ASC, ie.id_existencia ASC FOR UPDATE`,
 };
 
-const closeSublote = async (connection, id, explicitPesoMedido, { silent = false } = {}) => {
+const closeSublote = async (connection, id, explicitPesoMedido, { silent = false, id_usuario_modificacion = null } = {}) => {
   const [sublotRows] = await connection.query(maturationSublotQueries.findForUpdate, [id]);
 
   if (sublotRows.length === 0 || sublotRows[0].estado_registro !== SUBLOT_ACTIVE_STATE) {
@@ -190,8 +190,8 @@ const closeSublote = async (connection, id, explicitPesoMedido, { silent = false
   }
 
   await connection.query(
-    `UPDATE ${MATURATION_SUBLOT_TABLE} SET peso_neto_maduracion_kg = ?, perdida_maduracion_kg = ?, estado_registro = '${SUBLOT_READY_STATE}' WHERE id_sublote = ?`,
-    [pesoMedido, perdida, id]
+    `UPDATE ${MATURATION_SUBLOT_TABLE} SET peso_neto_maduracion_kg = ?, perdida_maduracion_kg = ?, estado_registro = '${SUBLOT_READY_STATE}', id_usuario_modificacion = ? WHERE id_sublote = ?`,
+    [pesoMedido, perdida, id_usuario_modificacion, id]
   );
 
   const [rows] = await connection.query(`${maturationSublotBaseQuery} WHERE s.id_sublote = ?`, [id]);
@@ -226,13 +226,13 @@ const loadProductionProcessDetail = async (connection, id) => {
 };
 
 const vehicleQueries = {
-  findAll: `SELECT id_vehiculo, placa, modelo, estado, kilometraje_actual, estado_registro, fecha_modificacion FROM ${VEHICLES_TABLE} WHERE estado_registro = '${ACTIVE_STATE}'`,
-  findById: `SELECT id_vehiculo, placa, modelo, estado, kilometraje_actual, estado_registro, fecha_modificacion FROM ${VEHICLES_TABLE} WHERE id_vehiculo = ? AND estado_registro = '${ACTIVE_STATE}'`,
+  findAll: `SELECT v.id_vehiculo, v.placa, v.modelo, v.estado, v.kilometraje_actual, v.estado_registro, v.fecha_modificacion, v.id_usuario_modificacion, u.nombre_completo AS usuario_modificacion_nombre FROM ${VEHICLES_TABLE} v LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = v.id_usuario_modificacion WHERE v.estado_registro = '${ACTIVE_STATE}'`,
+  findById: `SELECT v.id_vehiculo, v.placa, v.modelo, v.estado, v.kilometraje_actual, v.estado_registro, v.fecha_modificacion, v.id_usuario_modificacion, u.nombre_completo AS usuario_modificacion_nombre FROM ${VEHICLES_TABLE} v LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = v.id_usuario_modificacion WHERE v.id_vehiculo = ? AND v.estado_registro = '${ACTIVE_STATE}'`,
 };
 
 const vehicleServiceQueries = {
-  findAll: `SELECT sv.id_servicio, sv.id_vehiculo, v.placa AS vehiculo_placa, v.modelo AS vehiculo_modelo, sv.id_tipo_servicio, ts.nombre_servicio AS tipo_servicio_nombre, sv.fecha_servicio, sv.km_en_servicio, sv.costo_servicio, sv.proximo_servicio_km, sv.notas FROM ${VEHICLE_SERVICES_TABLE} sv LEFT JOIN ${VEHICLES_TABLE} v ON v.id_vehiculo = sv.id_vehiculo LEFT JOIN ${SERVICE_TYPES_TABLE} ts ON ts.id_tipo_servicio = sv.id_tipo_servicio ORDER BY sv.fecha_servicio DESC, sv.id_servicio DESC`,
-  findById: `SELECT sv.id_servicio, sv.id_vehiculo, v.placa AS vehiculo_placa, v.modelo AS vehiculo_modelo, sv.id_tipo_servicio, ts.nombre_servicio AS tipo_servicio_nombre, sv.fecha_servicio, sv.km_en_servicio, sv.costo_servicio, sv.proximo_servicio_km, sv.notas FROM ${VEHICLE_SERVICES_TABLE} sv LEFT JOIN ${VEHICLES_TABLE} v ON v.id_vehiculo = sv.id_vehiculo LEFT JOIN ${SERVICE_TYPES_TABLE} ts ON ts.id_tipo_servicio = sv.id_tipo_servicio WHERE sv.id_servicio = ?`,
+  findAll: `SELECT sv.id_servicio, sv.id_vehiculo, v.placa AS vehiculo_placa, v.modelo AS vehiculo_modelo, sv.id_tipo_servicio, ts.nombre_servicio AS tipo_servicio_nombre, sv.fecha_servicio, sv.km_en_servicio, sv.costo_servicio, sv.proximo_servicio_km, sv.notas, sv.fecha_modificacion, sv.id_usuario_modificacion, u.nombre_completo AS usuario_modificacion_nombre FROM ${VEHICLE_SERVICES_TABLE} sv LEFT JOIN ${VEHICLES_TABLE} v ON v.id_vehiculo = sv.id_vehiculo LEFT JOIN ${SERVICE_TYPES_TABLE} ts ON ts.id_tipo_servicio = sv.id_tipo_servicio LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = sv.id_usuario_modificacion ORDER BY sv.fecha_servicio DESC, sv.id_servicio DESC`,
+  findById: `SELECT sv.id_servicio, sv.id_vehiculo, v.placa AS vehiculo_placa, v.modelo AS vehiculo_modelo, sv.id_tipo_servicio, ts.nombre_servicio AS tipo_servicio_nombre, sv.fecha_servicio, sv.km_en_servicio, sv.costo_servicio, sv.proximo_servicio_km, sv.notas, sv.fecha_modificacion, sv.id_usuario_modificacion, u.nombre_completo AS usuario_modificacion_nombre FROM ${VEHICLE_SERVICES_TABLE} sv LEFT JOIN ${VEHICLES_TABLE} v ON v.id_vehiculo = sv.id_vehiculo LEFT JOIN ${SERVICE_TYPES_TABLE} ts ON ts.id_tipo_servicio = sv.id_tipo_servicio LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = sv.id_usuario_modificacion WHERE sv.id_servicio = ?`,
 };
 
 const vehicleMileageReportQueries = {
@@ -252,18 +252,18 @@ const handlers = {
     const [rows] = await pool.query(userQueries.findByUsername, [username]);
     return rows[0] || null;
   },
-  'users.create': async ({ nombre_completo, username, password_hash, rol, estado_registro }) => {
+  'users.create': async ({ nombre_completo, username, password_hash, rol, estado_registro, id_usuario_modificacion }) => {
     const [result] = await pool.query(
-      `INSERT INTO ${USERS_TABLE} (nombre_completo, username, password_hash, rol, estado_registro) VALUES (?, ?, ?, ?, ?)`,
-      [nombre_completo, username, password_hash, rol, estado_registro || ACTIVE_STATE]
+      `INSERT INTO ${USERS_TABLE} (nombre_completo, username, password_hash, rol, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?)`,
+      [nombre_completo, username, password_hash, rol, estado_registro || ACTIVE_STATE, id_usuario_modificacion ?? null]
     );
     const [rows] = await pool.query(userQueries.findById, [result.insertId]);
     return rows[0] || null;
   },
-  'users.update': async ({ id, nombre_completo, username, password_hash, rol, estado_registro }) => {
+  'users.update': async ({ id, nombre_completo, username, password_hash, rol, estado_registro, id_usuario_modificacion }) => {
     const [result] = await pool.query(
-      `UPDATE ${USERS_TABLE} SET nombre_completo = ?, username = ?, password_hash = ?, rol = ?, estado_registro = COALESCE(?, estado_registro) WHERE id_usuario = ? AND estado_registro = '${ACTIVE_STATE}'`,
-      [nombre_completo, username, password_hash, rol, estado_registro ?? null, id]
+      `UPDATE ${USERS_TABLE} SET nombre_completo = ?, username = ?, password_hash = ?, rol = ?, estado_registro = COALESCE(?, estado_registro), id_usuario_modificacion = ? WHERE id_usuario = ? AND estado_registro = '${ACTIVE_STATE}'`,
+      [nombre_completo, username, password_hash, rol, estado_registro ?? null, id_usuario_modificacion ?? null, id]
     );
 
     if (result.affectedRows === 0) {
@@ -273,10 +273,10 @@ const handlers = {
     const [rows] = await pool.query(userQueries.findById, [id]);
     return rows[0] || null;
   },
-  'users.resetPassword': async ({ id, password_hash }) => {
+  'users.resetPassword': async ({ id, password_hash, id_usuario_modificacion }) => {
     const [result] = await pool.query(
-      `UPDATE ${USERS_TABLE} SET password_hash = ? WHERE id_usuario = ? AND estado_registro = '${ACTIVE_STATE}'`,
-      [password_hash, id]
+      `UPDATE ${USERS_TABLE} SET password_hash = ?, id_usuario_modificacion = ? WHERE id_usuario = ? AND estado_registro = '${ACTIVE_STATE}'`,
+      [password_hash, id_usuario_modificacion ?? null, id]
     );
 
     if (result.affectedRows === 0) {
@@ -286,10 +286,10 @@ const handlers = {
     const [rows] = await pool.query(userQueries.findById, [id]);
     return rows[0] || null;
   },
-  'users.remove': async ({ id }) => {
+  'users.remove': async ({ id, id_usuario_modificacion }) => {
     const [result] = await pool.query(
-      `UPDATE ${USERS_TABLE} SET estado_registro = '${INACTIVE_STATE}' WHERE id_usuario = ? AND estado_registro = '${ACTIVE_STATE}'`,
-      [id]
+      `UPDATE ${USERS_TABLE} SET estado_registro = '${INACTIVE_STATE}', id_usuario_modificacion = ? WHERE id_usuario = ? AND estado_registro = '${ACTIVE_STATE}'`,
+      [id_usuario_modificacion ?? null, id]
     );
     return result.affectedRows > 0;
   },
@@ -301,19 +301,19 @@ const handlers = {
     const [rows] = await pool.query(providerQueries.findById, [id]);
     return rows[0] || null;
   },
-  'providers.create': async ({ nombre_empresa, nit, contacto_nombre, telefono, estado_registro }) => {
+  'providers.create': async ({ nombre_empresa, nit, contacto_nombre, telefono, estado_registro, id_usuario_modificacion }) => {
     const [result] = await pool.query(
-      `INSERT INTO ${PROVIDERS_TABLE} (nombre_empresa, nit, contacto_nombre, telefono, estado_registro) VALUES (?, ?, ?, ?, ?)`,
-      [nombre_empresa, nit ?? null, contacto_nombre ?? null, telefono ?? null, estado_registro || ACTIVE_STATE]
+      `INSERT INTO ${PROVIDERS_TABLE} (nombre_empresa, nit, contacto_nombre, telefono, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?)`,
+      [nombre_empresa, nit ?? null, contacto_nombre ?? null, telefono ?? null, estado_registro || ACTIVE_STATE, id_usuario_modificacion ?? null]
     );
 
     const [rows] = await pool.query(providerQueries.findById, [result.insertId]);
     return rows[0] || null;
   },
-  'providers.update': async ({ id, nombre_empresa, nit, contacto_nombre, telefono, estado_registro }) => {
+  'providers.update': async ({ id, nombre_empresa, nit, contacto_nombre, telefono, estado_registro, id_usuario_modificacion }) => {
     const [result] = await pool.query(
-      `UPDATE ${PROVIDERS_TABLE} SET nombre_empresa = ?, nit = ?, contacto_nombre = ?, telefono = ?, estado_registro = COALESCE(?, estado_registro) WHERE id_proveedor = ? AND estado_registro = '${ACTIVE_STATE}'`,
-      [nombre_empresa, nit ?? null, contacto_nombre ?? null, telefono ?? null, estado_registro ?? null, id]
+      `UPDATE ${PROVIDERS_TABLE} SET nombre_empresa = ?, nit = ?, contacto_nombre = ?, telefono = ?, estado_registro = COALESCE(?, estado_registro), id_usuario_modificacion = ? WHERE id_proveedor = ? AND estado_registro = '${ACTIVE_STATE}'`,
+      [nombre_empresa, nit ?? null, contacto_nombre ?? null, telefono ?? null, estado_registro ?? null, id_usuario_modificacion ?? null, id]
     );
 
     if (result.affectedRows === 0) {
@@ -323,10 +323,10 @@ const handlers = {
     const [rows] = await pool.query(providerQueries.findById, [id]);
     return rows[0] || null;
   },
-  'providers.remove': async ({ id }) => {
+  'providers.remove': async ({ id, id_usuario_modificacion }) => {
     const [result] = await pool.query(
-      `UPDATE ${PROVIDERS_TABLE} SET estado_registro = '${INACTIVE_STATE}' WHERE id_proveedor = ? AND estado_registro = '${ACTIVE_STATE}'`,
-      [id]
+      `UPDATE ${PROVIDERS_TABLE} SET estado_registro = '${INACTIVE_STATE}', id_usuario_modificacion = ? WHERE id_proveedor = ? AND estado_registro = '${ACTIVE_STATE}'`,
+      [id_usuario_modificacion ?? null, id]
     );
     return result.affectedRows > 0;
   },
@@ -344,15 +344,17 @@ const handlers = {
     telefono,
     nit_facturacion,
     estado_registro,
+    id_usuario_modificacion,
   }) => {
     const [result] = await pool.query(
-      `INSERT INTO ${CLIENTS_TABLE} (nombre_comercial, direccion_entrega, telefono, nit_facturacion, estado_registro) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO ${CLIENTS_TABLE} (nombre_comercial, direccion_entrega, telefono, nit_facturacion, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?)`,
       [
         nombre_comercial,
         normalizeNullableText(direccion_entrega),
         normalizeNullableText(telefono),
         normalizeNullableText(nit_facturacion),
         estado_registro || ACTIVE_STATE,
+        id_usuario_modificacion ?? null,
       ]
     );
 
@@ -366,15 +368,17 @@ const handlers = {
     telefono,
     nit_facturacion,
     estado_registro,
+    id_usuario_modificacion,
   }) => {
     const [result] = await pool.query(
-      `UPDATE ${CLIENTS_TABLE} SET nombre_comercial = ?, direccion_entrega = ?, telefono = ?, nit_facturacion = ?, estado_registro = COALESCE(?, estado_registro) WHERE id_cliente = ? AND estado_registro = '${ACTIVE_STATE}'`,
+      `UPDATE ${CLIENTS_TABLE} SET nombre_comercial = ?, direccion_entrega = ?, telefono = ?, nit_facturacion = ?, estado_registro = COALESCE(?, estado_registro), id_usuario_modificacion = ? WHERE id_cliente = ? AND estado_registro = '${ACTIVE_STATE}'`,
       [
         nombre_comercial,
         normalizeNullableText(direccion_entrega),
         normalizeNullableText(telefono),
         normalizeNullableText(nit_facturacion),
         estado_registro ?? null,
+        id_usuario_modificacion ?? null,
         id,
       ]
     );
@@ -386,10 +390,10 @@ const handlers = {
     const [rows] = await pool.query(clientQueries.findById, [id]);
     return rows[0] || null;
   },
-  'clients.remove': async ({ id }) => {
+  'clients.remove': async ({ id, id_usuario_modificacion }) => {
     const [result] = await pool.query(
-      `UPDATE ${CLIENTS_TABLE} SET estado_registro = '${INACTIVE_STATE}' WHERE id_cliente = ? AND estado_registro = '${ACTIVE_STATE}'`,
-      [id]
+      `UPDATE ${CLIENTS_TABLE} SET estado_registro = '${INACTIVE_STATE}', id_usuario_modificacion = ? WHERE id_cliente = ? AND estado_registro = '${ACTIVE_STATE}'`,
+      [id_usuario_modificacion ?? null, id]
     );
     return result.affectedRows > 0;
   },
@@ -417,7 +421,7 @@ const handlers = {
       await connection.beginTransaction();
 
       const [entryResult] = await connection.query(
-        `INSERT INTO ${ENTRIES_TABLE} (id_proveedor, documento_referencia, costo_unitario, costo_total, id_usuario_receptor, estado_registro) VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ${ENTRIES_TABLE} (id_proveedor, documento_referencia, costo_unitario, costo_total, id_usuario_receptor, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           id_proveedor,
           normalizeNullableText(documento_referencia),
@@ -425,6 +429,7 @@ const handlers = {
           normalizeNullableText(costo_unitario) === null ? null : Number(costo_unitario) * Number(cantidad_disponible),
           id_usuario_receptor,
           ACTIVE_STATE,
+          id_usuario_receptor,
         ]
       );
 
@@ -439,16 +444,17 @@ const handlers = {
         existenciaId = existingExistencias[0].id_existencia;
 
         await connection.query(
-          `UPDATE ${INVENTORY_TABLE} SET id_proveedor = ?, fecha_vencimiento = ? WHERE id_existencia = ?`,
+          `UPDATE ${INVENTORY_TABLE} SET id_proveedor = ?, fecha_vencimiento = ?, id_usuario_modificacion = ? WHERE id_existencia = ?`,
           [
             id_proveedor,
             fecha_vencimiento,
+            id_usuario_receptor,
             existenciaId,
           ]
         );
       } else {
         const [existenceResult] = await connection.query(
-          `INSERT INTO ${INVENTORY_TABLE} (id_producto, id_proveedor, id_proceso_origen, id_entrada_origen, fecha_vencimiento, cantidad_disponible, costo_unitario, estado_registro) VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`,
+          `INSERT INTO ${INVENTORY_TABLE} (id_producto, id_proveedor, id_proceso_origen, id_entrada_origen, fecha_vencimiento, cantidad_disponible, costo_unitario, estado_registro, id_usuario_modificacion) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?)`,
           [
             id_producto,
             id_proveedor,
@@ -457,6 +463,7 @@ const handlers = {
             0,
             normalizeNullableText(costo_unitario),
             ACTIVE_STATE,
+            id_usuario_receptor,
           ]
         );
 
@@ -502,7 +509,7 @@ const handlers = {
         }
 
         const [lotResult] = await connection.query(
-          `INSERT INTO ${RAW_MATERIAL_LOTS_TABLE} (id_producto, id_proveedor, id_entrada_origen, fecha_recepcion, cantidad_unidades, peso_inicial_kg, estado_maduracion, estado_registro) VALUES (?, ?, ?, CURRENT_DATE, ?, ?, ?, ?)`,
+          `INSERT INTO ${RAW_MATERIAL_LOTS_TABLE} (id_producto, id_proveedor, id_entrada_origen, fecha_recepcion, cantidad_unidades, peso_inicial_kg, estado_maduracion, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, CURRENT_DATE, ?, ?, ?, ?, ?)`,
           [
             id_producto,
             id_proveedor,
@@ -511,6 +518,7 @@ const handlers = {
             pesoInicialKg,
             'Verde',
             PENDING_STATE,
+            id_usuario_receptor,
           ]
         );
 
@@ -568,7 +576,7 @@ const handlers = {
     const [result] = await pool.query(`DELETE FROM ${ENTRADA_UNIDADES_TABLE} WHERE id = ?`, [id]);
     return result.affectedRows > 0;
   },
-  'entries.remove': async ({ id }) => {
+  'entries.remove': async ({ id, id_usuario_modificacion }) => {
     const connection = await pool.getConnection();
 
     try {
@@ -604,25 +612,25 @@ const handlers = {
         const avgCost = avgCostRows[0]?.avg_cost ?? null;
 
         await connection.query(
-          `UPDATE ${INVENTORY_TABLE} SET cantidad_disponible = ?, costo_unitario = ?, estado_registro = CASE WHEN ? > 0 THEN '${ACTIVE_STATE}' ELSE '${INACTIVE_STATE}' END, id_entrada_origen = NULL WHERE id_existencia = ?`,
-          [netQuantity, avgCost, netQuantity, existenceId]
+          `UPDATE ${INVENTORY_TABLE} SET cantidad_disponible = ?, costo_unitario = ?, estado_registro = CASE WHEN ? > 0 THEN '${ACTIVE_STATE}' ELSE '${INACTIVE_STATE}' END, id_entrada_origen = NULL, id_usuario_modificacion = ? WHERE id_existencia = ?`,
+          [netQuantity, avgCost, netQuantity, id_usuario_modificacion ?? null, existenceId]
         );
       }
 
       // If any active inventory row still references this entry as origin, release FK before marking inactive.
       await connection.query(
-        `UPDATE ${INVENTORY_TABLE} SET id_entrada_origen = NULL WHERE id_entrada_origen = ? AND estado_registro = '${ACTIVE_STATE}'`,
-        [id]
+        `UPDATE ${INVENTORY_TABLE} SET id_entrada_origen = NULL, id_usuario_modificacion = ? WHERE id_entrada_origen = ? AND estado_registro = '${ACTIVE_STATE}'`,
+        [id_usuario_modificacion ?? null, id]
       );
 
       await connection.query(
-        `UPDATE ${RAW_MATERIAL_LOTS_TABLE} SET estado_registro = '${INACTIVE_STATE}' WHERE id_entrada_origen = ? AND estado_registro <> '${INACTIVE_STATE}'`,
-        [id]
+        `UPDATE ${RAW_MATERIAL_LOTS_TABLE} SET estado_registro = '${INACTIVE_STATE}', id_usuario_modificacion = ? WHERE id_entrada_origen = ? AND estado_registro <> '${INACTIVE_STATE}'`,
+        [id_usuario_modificacion ?? null, id]
       );
 
       const [result] = await connection.query(
-        `UPDATE ${ENTRIES_TABLE} SET estado_registro = '${INACTIVE_STATE}' WHERE id_entrada = ? AND estado_registro = '${ACTIVE_STATE}'`,
-        [id]
+        `UPDATE ${ENTRIES_TABLE} SET estado_registro = '${INACTIVE_STATE}', id_usuario_modificacion = ? WHERE id_entrada = ? AND estado_registro = '${ACTIVE_STATE}'`,
+        [id_usuario_modificacion ?? null, id]
       );
 
       if (result.affectedRows === 0) {
@@ -691,9 +699,10 @@ const handlers = {
     stock_minimo,
     precio_venta_sugerido,
     estado_registro,
+    id_usuario_modificacion,
   }) => {
     const [result] = await pool.query(
-      `INSERT INTO ${PRODUCTS_TABLE} (nombre, descripcion, unidad_medida, tipo_producto, stock_minimo, precio_venta_sugerido, estado_registro) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO ${PRODUCTS_TABLE} (nombre, descripcion, unidad_medida, tipo_producto, stock_minimo, precio_venta_sugerido, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         nombre,
         descripcion ?? null,
@@ -702,6 +711,7 @@ const handlers = {
         stock_minimo ?? 10,
         precio_venta_sugerido ?? 0,
         estado_registro || ACTIVE_STATE,
+        id_usuario_modificacion ?? null,
       ]
     );
 
@@ -717,9 +727,10 @@ const handlers = {
     stock_minimo,
     precio_venta_sugerido,
     estado_registro,
+    id_usuario_modificacion,
   }) => {
     const [result] = await pool.query(
-      `UPDATE ${PRODUCTS_TABLE} SET nombre = ?, descripcion = ?, unidad_medida = ?, tipo_producto = ?, stock_minimo = ?, precio_venta_sugerido = ?, estado_registro = COALESCE(?, estado_registro) WHERE id_producto = ? AND estado_registro = '${ACTIVE_STATE}'`,
+      `UPDATE ${PRODUCTS_TABLE} SET nombre = ?, descripcion = ?, unidad_medida = ?, tipo_producto = ?, stock_minimo = ?, precio_venta_sugerido = ?, estado_registro = COALESCE(?, estado_registro), id_usuario_modificacion = ? WHERE id_producto = ? AND estado_registro = '${ACTIVE_STATE}'`,
       [
         nombre,
         descripcion ?? null,
@@ -728,6 +739,7 @@ const handlers = {
         stock_minimo ?? 10,
         precio_venta_sugerido ?? 0,
         estado_registro ?? null,
+        id_usuario_modificacion ?? null,
         id,
       ]
     );
@@ -739,10 +751,10 @@ const handlers = {
     const [rows] = await pool.query(productQueries.findById, [id]);
     return rows[0] || null;
   },
-  'products.remove': async ({ id }) => {
+  'products.remove': async ({ id, id_usuario_modificacion }) => {
     const [result] = await pool.query(
-      `UPDATE ${PRODUCTS_TABLE} SET estado_registro = '${INACTIVE_STATE}' WHERE id_producto = ? AND estado_registro = '${ACTIVE_STATE}'`,
-      [id]
+      `UPDATE ${PRODUCTS_TABLE} SET estado_registro = '${INACTIVE_STATE}', id_usuario_modificacion = ? WHERE id_producto = ? AND estado_registro = '${ACTIVE_STATE}'`,
+      [id_usuario_modificacion ?? null, id]
     );
     return result.affectedRows > 0;
   },
@@ -758,30 +770,32 @@ const handlers = {
     const [rows] = await pool.query(serviceTypeQueries.findById, [id]);
     return rows[0] || null;
   },
-  'serviceTypes.create': async ({ nombre_servicio, descripcion, km_frecuencia }) => {
+  'serviceTypes.create': async ({ nombre_servicio, descripcion, km_frecuencia, id_usuario_modificacion }) => {
     const [result] = await pool.query(
-      `INSERT INTO ${SERVICE_TYPES_TABLE} (nombre_servicio, descripcion, km_frecuencia) VALUES (?, ?, ?)`,
+      `INSERT INTO ${SERVICE_TYPES_TABLE} (nombre_servicio, descripcion, km_frecuencia, id_usuario_modificacion) VALUES (?, ?, ?, ?)`,
       [
         nombre_servicio,
         normalizeNullableText(descripcion),
         km_frecuencia === undefined || km_frecuencia === null || km_frecuencia === ''
           ? null
           : Number(km_frecuencia),
+        id_usuario_modificacion ?? null,
       ]
     );
 
     const [rows] = await pool.query(serviceTypeQueries.findById, [result.insertId]);
     return rows[0] || null;
   },
-  'serviceTypes.update': async ({ id, nombre_servicio, descripcion, km_frecuencia }) => {
+  'serviceTypes.update': async ({ id, nombre_servicio, descripcion, km_frecuencia, id_usuario_modificacion }) => {
     const [result] = await pool.query(
-      `UPDATE ${SERVICE_TYPES_TABLE} SET nombre_servicio = ?, descripcion = ?, km_frecuencia = ? WHERE id_tipo_servicio = ?`,
+      `UPDATE ${SERVICE_TYPES_TABLE} SET nombre_servicio = ?, descripcion = ?, km_frecuencia = ?, id_usuario_modificacion = ? WHERE id_tipo_servicio = ?`,
       [
         nombre_servicio,
         normalizeNullableText(descripcion),
         km_frecuencia === undefined || km_frecuencia === null || km_frecuencia === ''
           ? null
           : Number(km_frecuencia),
+        id_usuario_modificacion ?? null,
         id,
       ]
     );
@@ -817,9 +831,10 @@ const handlers = {
     peso_inicial_kg,
     estado_maduracion,
     estado_registro,
+    id_usuario_modificacion,
   }) => {
     const [result] = await pool.query(
-      `INSERT INTO ${RAW_MATERIAL_LOTS_TABLE} (id_producto, id_proveedor, id_entrada_origen, fecha_recepcion, cantidad_unidades, peso_inicial_kg, estado_maduracion, estado_registro) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO ${RAW_MATERIAL_LOTS_TABLE} (id_producto, id_proveedor, id_entrada_origen, fecha_recepcion, cantidad_unidades, peso_inicial_kg, estado_maduracion, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id_producto,
         id_proveedor,
@@ -831,6 +846,7 @@ const handlers = {
         Number(peso_inicial_kg),
         normalizeNullableText(estado_maduracion) || 'Verde',
         normalizeNullableText(estado_registro) || PENDING_STATE,
+        id_usuario_modificacion ?? null,
       ]
     );
 
@@ -847,9 +863,10 @@ const handlers = {
     peso_inicial_kg,
     estado_maduracion,
     estado_registro,
+    id_usuario_modificacion,
   }) => {
     const [result] = await pool.query(
-      `UPDATE ${RAW_MATERIAL_LOTS_TABLE} SET id_producto = ?, id_proveedor = ?, id_entrada_origen = ?, fecha_recepcion = ?, cantidad_unidades = ?, peso_inicial_kg = ?, estado_maduracion = ?, estado_registro = COALESCE(?, estado_registro) WHERE id_lote_mp = ? AND estado_registro <> '${INACTIVE_STATE}'`,
+      `UPDATE ${RAW_MATERIAL_LOTS_TABLE} SET id_producto = ?, id_proveedor = ?, id_entrada_origen = ?, fecha_recepcion = ?, cantidad_unidades = ?, peso_inicial_kg = ?, estado_maduracion = ?, estado_registro = COALESCE(?, estado_registro), id_usuario_modificacion = ? WHERE id_lote_mp = ? AND estado_registro <> '${INACTIVE_STATE}'`,
       [
         id_producto,
         id_proveedor,
@@ -861,6 +878,7 @@ const handlers = {
         Number(peso_inicial_kg),
         normalizeNullableText(estado_maduracion) || 'Verde',
         normalizeNullableText(estado_registro),
+        id_usuario_modificacion ?? null,
         id,
       ]
     );
@@ -872,14 +890,14 @@ const handlers = {
     const [rows] = await pool.query(maturationLotQueries.findById, [id]);
     return rows[0] || null;
   },
-  'maturationLots.remove': async ({ id }) => {
+  'maturationLots.remove': async ({ id, id_usuario_modificacion }) => {
     const [result] = await pool.query(
-      `UPDATE ${RAW_MATERIAL_LOTS_TABLE} SET estado_registro = '${INACTIVE_STATE}' WHERE id_lote_mp = ? AND estado_registro <> '${INACTIVE_STATE}'`,
-      [id]
+      `UPDATE ${RAW_MATERIAL_LOTS_TABLE} SET estado_registro = '${INACTIVE_STATE}', id_usuario_modificacion = ? WHERE id_lote_mp = ? AND estado_registro <> '${INACTIVE_STATE}'`,
+      [id_usuario_modificacion ?? null, id]
     );
     return result.affectedRows > 0;
   },
-  'maturationLots.accept': async ({ id, estado_maduracion }) => {
+  'maturationLots.accept': async ({ id, estado_maduracion, id_usuario_modificacion }) => {
     const connection = await pool.getConnection();
 
     try {
@@ -895,15 +913,15 @@ const handlers = {
       const lot = lotRows[0];
 
       await connection.query(
-        `UPDATE ${RAW_MATERIAL_LOTS_TABLE} SET estado_maduracion = ?, estado_registro = '${ACTIVE_STATE}' WHERE id_lote_mp = ?`,
-        [estado_maduracion, id]
+        `UPDATE ${RAW_MATERIAL_LOTS_TABLE} SET estado_maduracion = ?, estado_registro = '${ACTIVE_STATE}', id_usuario_modificacion = ? WHERE id_lote_mp = ?`,
+        [estado_maduracion, id_usuario_modificacion ?? null, id]
       );
 
       const isMature = estado_maduracion === MATURE_RIPENESS_STATE;
       const pesoInicial = Number(lot.peso_inicial_kg);
 
       const [result] = await connection.query(
-        `INSERT INTO ${MATURATION_SUBLOT_TABLE} (id_lote_mp, codigo_sublote, peso_inicial_kg, peso_kg, peso_neto_maduracion_kg, perdida_maduracion_kg, cantidad_unidades, estado_maduracion, estado_registro) VALUES (?, 'A', ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ${MATURATION_SUBLOT_TABLE} (id_lote_mp, codigo_sublote, peso_inicial_kg, peso_kg, peso_neto_maduracion_kg, perdida_maduracion_kg, cantidad_unidades, estado_maduracion, estado_registro, id_usuario_modificacion) VALUES (?, 'A', ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           pesoInicial,
@@ -913,6 +931,7 @@ const handlers = {
           lot.cantidad_unidades,
           estado_maduracion,
           isMature ? SUBLOT_READY_STATE : SUBLOT_ACTIVE_STATE,
+          id_usuario_modificacion ?? null,
         ]
       );
 
@@ -966,7 +985,7 @@ const handlers = {
     const [rows] = await pool.query(maturationSublotQueries.findReadyForProduction);
     return rows;
   },
-  'maturationSublots.split': async ({ id, peso_kg, observaciones }) => {
+  'maturationSublots.split': async ({ id, peso_kg, observaciones, id_usuario_modificacion }) => {
     const connection = await pool.getConnection();
 
     try {
@@ -1000,15 +1019,15 @@ const handlers = {
       }
 
       await connection.query(
-        `UPDATE ${MATURATION_SUBLOT_TABLE} SET peso_kg = peso_kg - ?, cantidad_unidades = ? WHERE id_sublote = ?`,
-        [splitWeight, remainingUnits, id]
+        `UPDATE ${MATURATION_SUBLOT_TABLE} SET peso_kg = peso_kg - ?, cantidad_unidades = ?, id_usuario_modificacion = ? WHERE id_sublote = ?`,
+        [splitWeight, remainingUnits, id_usuario_modificacion ?? null, id]
       );
 
       const [countRows] = await connection.query(maturationSublotQueries.countByLot, [origin.id_lote_mp]);
       const nextCode = `A${Number(countRows[0].total) + 1}`;
 
       const [result] = await connection.query(
-        `INSERT INTO ${MATURATION_SUBLOT_TABLE} (id_lote_mp, codigo_sublote, peso_inicial_kg, peso_kg, cantidad_unidades, estado_maduracion, estado_registro, observaciones) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ${MATURATION_SUBLOT_TABLE} (id_lote_mp, codigo_sublote, peso_inicial_kg, peso_kg, cantidad_unidades, estado_maduracion, estado_registro, observaciones, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           origin.id_lote_mp,
           nextCode,
@@ -1018,6 +1037,7 @@ const handlers = {
           origin.estado_maduracion,
           SUBLOT_ACTIVE_STATE,
           normalizeNullableText(observaciones),
+          id_usuario_modificacion ?? null,
         ]
       );
 
@@ -1039,12 +1059,12 @@ const handlers = {
       connection.release();
     }
   },
-  'maturationSublots.close': async ({ id, peso_medido_kg }) => {
+  'maturationSublots.close': async ({ id, peso_medido_kg, id_usuario_modificacion }) => {
     const connection = await pool.getConnection();
 
     try {
       await connection.beginTransaction();
-      const result = await closeSublote(connection, id, peso_medido_kg, { silent: false });
+      const result = await closeSublote(connection, id, peso_medido_kg, { silent: false, id_usuario_modificacion });
       await connection.commit();
       return result;
     } catch (error) {
@@ -1069,6 +1089,7 @@ const handlers = {
     porcentaje_materia_seca,
     temperatura_cuarto,
     observaciones,
+    id_usuario_modificacion,
   }) => {
     const connection = await pool.getConnection();
 
@@ -1076,7 +1097,7 @@ const handlers = {
       await connection.beginTransaction();
 
       const [result] = await connection.query(
-        `INSERT INTO ${MATURATION_CONTROL_TABLE} (id_sublote, grados_brix, peso_medido_kg, porcentaje_materia_seca, temperatura_cuarto, observaciones) VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ${MATURATION_CONTROL_TABLE} (id_sublote, grados_brix, peso_medido_kg, porcentaje_materia_seca, temperatura_cuarto, observaciones, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           id_sublote,
           Number(grados_brix),
@@ -1090,13 +1111,14 @@ const handlers = {
             ? null
             : Number(temperatura_cuarto),
           normalizeNullableText(observaciones),
+          id_usuario_modificacion ?? null,
         ]
       );
 
       let subloteWasPromoted = false;
 
       if (Number(grados_brix) >= MATURATION_BRIX_THRESHOLD) {
-        const promoted = await closeSublote(connection, id_sublote, peso_medido_kg, { silent: true });
+        const promoted = await closeSublote(connection, id_sublote, peso_medido_kg, { silent: true, id_usuario_modificacion });
         subloteWasPromoted = Boolean(promoted);
       }
 
@@ -1158,8 +1180,8 @@ const handlers = {
       const nextState = nextWeight <= 0 ? SUBLOT_GREEN_NET_STATE : SUBLOT_ACTIVE_STATE;
 
       await connection.query(
-        `UPDATE ${MATURATION_SUBLOT_TABLE} SET peso_kg = ?, estado_registro = ? WHERE id_sublote = ?`,
-        [nextWeight, nextState, id_sublote]
+        `UPDATE ${MATURATION_SUBLOT_TABLE} SET peso_kg = ?, estado_registro = ?, id_usuario_modificacion = ? WHERE id_sublote = ?`,
+        [nextWeight, nextState, id_usuario ?? null, id_sublote]
       );
 
       const [lotRows] = await connection.query(
@@ -1178,13 +1200,13 @@ const handlers = {
       if (existingInventoryRows.length > 0) {
         existenceId = existingInventoryRows[0].id_existencia;
         await connection.query(
-          `UPDATE ${INVENTORY_TABLE} SET fecha_vencimiento = ?, costo_unitario = COALESCE(?, costo_unitario) WHERE id_existencia = ?`,
-          [fecha_vencimiento, costo_unitario ?? null, existenceId]
+          `UPDATE ${INVENTORY_TABLE} SET fecha_vencimiento = ?, costo_unitario = COALESCE(?, costo_unitario), id_usuario_modificacion = ? WHERE id_existencia = ?`,
+          [fecha_vencimiento, costo_unitario ?? null, id_usuario ?? null, existenceId]
         );
       } else {
         const [existenceResult] = await connection.query(
-          `INSERT INTO ${INVENTORY_TABLE} (id_producto, id_proveedor, id_proceso_origen, id_entrada_origen, fecha_vencimiento, cantidad_disponible, costo_unitario, estado_registro) VALUES (?, ?, NULL, NULL, ?, ?, ?, ?)`,
-          [id_producto, supplierId, fecha_vencimiento, 0, costo_unitario ?? null, ACTIVE_STATE]
+          `INSERT INTO ${INVENTORY_TABLE} (id_producto, id_proveedor, id_proceso_origen, id_entrada_origen, fecha_vencimiento, cantidad_disponible, costo_unitario, estado_registro, id_usuario_modificacion) VALUES (?, ?, NULL, NULL, ?, ?, ?, ?, ?)`,
+          [id_producto, supplierId, fecha_vencimiento, 0, costo_unitario ?? null, ACTIVE_STATE, id_usuario ?? null]
         );
         existenceId = existenceResult.insertId;
       }
@@ -1252,12 +1274,12 @@ const handlers = {
       const nextState = nextWeight <= 0 ? SUBLOT_SENT_STATE : SUBLOT_READY_STATE;
 
       await connection.query(
-        `UPDATE ${MATURATION_SUBLOT_TABLE} SET peso_kg = ?, estado_registro = ? WHERE id_sublote = ?`,
-        [nextWeight, nextState, id_sublote]
+        `UPDATE ${MATURATION_SUBLOT_TABLE} SET peso_kg = ?, estado_registro = ?, id_usuario_modificacion = ? WHERE id_sublote = ?`,
+        [nextWeight, nextState, id_usuario_registro ?? null, id_sublote]
       );
 
       const [result] = await connection.query(
-        `INSERT INTO ${PRODUCTION_TABLE} (id_sublote, id_producto_resultado, cantidad_ingresada_kg, estado_proceso, fecha_inicio, cuarto_congelado, ubicacion_cuarto_congelado, observaciones, id_usuario_registro, estado_registro) VALUES (?, ?, ?, ?, COALESCE(?, NOW()), ?, ?, ?, ?, ?)`,
+        `INSERT INTO ${PRODUCTION_TABLE} (id_sublote, id_producto_resultado, cantidad_ingresada_kg, estado_proceso, fecha_inicio, cuarto_congelado, ubicacion_cuarto_congelado, observaciones, id_usuario_registro, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, COALESCE(?, NOW()), ?, ?, ?, ?, ?, ?)`,
         [
           id_sublote,
           id_producto_resultado,
@@ -1269,6 +1291,7 @@ const handlers = {
           normalizeNullableText(observaciones),
           id_usuario_registro ?? null,
           ACTIVE_STATE,
+          id_usuario_registro ?? null,
         ]
       );
 
@@ -1289,6 +1312,7 @@ const handlers = {
     fecha_inicio,
     cantidad_entrada_kg,
     observaciones,
+    id_usuario_modificacion,
   }) => {
     const connection = await pool.getConnection();
 
@@ -1302,7 +1326,7 @@ const handlers = {
       }
 
       const [result] = await connection.query(
-        `INSERT INTO ${PRODUCTION_STAGE_TABLE} (id_proceso, nombre_etapa, cantidad_personas, personal_asignado, fecha_inicio, cantidad_entrada_kg, observaciones, estado_registro) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ${PRODUCTION_STAGE_TABLE} (id_proceso, nombre_etapa, cantidad_personas, personal_asignado, fecha_inicio, cantidad_entrada_kg, observaciones, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           nombre_etapa,
@@ -1312,6 +1336,7 @@ const handlers = {
           cantidad_entrada_kg ?? null,
           normalizeNullableText(observaciones),
           ACTIVE_STATE,
+          id_usuario_modificacion ?? null,
         ]
       );
 
@@ -1337,9 +1362,10 @@ const handlers = {
     cantidad_salida_kg,
     merma_kg,
     observaciones,
+    id_usuario_modificacion,
   }) => {
     const [result] = await pool.query(
-      `UPDATE ${PRODUCTION_STAGE_TABLE} SET nombre_etapa = ?, cantidad_personas = ?, personal_asignado = ?, fecha_inicio = ?, fecha_fin = ?, cantidad_entrada_kg = ?, cantidad_salida_kg = ?, merma_kg = ?, observaciones = ? WHERE id_etapa = ? AND id_proceso = ? AND estado_registro = '${ACTIVE_STATE}'`,
+      `UPDATE ${PRODUCTION_STAGE_TABLE} SET nombre_etapa = ?, cantidad_personas = ?, personal_asignado = ?, fecha_inicio = ?, fecha_fin = ?, cantidad_entrada_kg = ?, cantidad_salida_kg = ?, merma_kg = ?, observaciones = ?, id_usuario_modificacion = ? WHERE id_etapa = ? AND id_proceso = ? AND estado_registro = '${ACTIVE_STATE}'`,
       [
         nombre_etapa,
         cantidad_personas ?? null,
@@ -1350,6 +1376,7 @@ const handlers = {
         cantidad_salida_kg ?? null,
         merma_kg ?? null,
         normalizeNullableText(observaciones),
+        id_usuario_modificacion ?? null,
         id_etapa,
         id,
       ]
@@ -1362,7 +1389,7 @@ const handlers = {
     const [rows] = await pool.query(productionStageQueries.findById, [id_etapa]);
     return rows[0] || null;
   },
-  'productionProcesses.addMerma': async ({ id, id_etapa, id_tipo_merma, cantidad_kg, observaciones }) => {
+  'productionProcesses.addMerma': async ({ id, id_etapa, id_tipo_merma, cantidad_kg, observaciones, id_usuario_modificacion }) => {
     const connection = await pool.getConnection();
 
     try {
@@ -1375,8 +1402,8 @@ const handlers = {
       }
 
       const [result] = await connection.query(
-        `INSERT INTO ${PRODUCTION_MERMA_TABLE} (id_proceso, id_etapa, id_tipo_merma, cantidad_kg, observaciones, estado_registro) VALUES (?, ?, ?, ?, ?, ?)`,
-        [id, id_etapa ?? null, id_tipo_merma, cantidad_kg, normalizeNullableText(observaciones), ACTIVE_STATE]
+        `INSERT INTO ${PRODUCTION_MERMA_TABLE} (id_proceso, id_etapa, id_tipo_merma, cantidad_kg, observaciones, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [id, id_etapa ?? null, id_tipo_merma, cantidad_kg, normalizeNullableText(observaciones), ACTIVE_STATE, id_usuario_modificacion ?? null]
       );
 
       await connection.commit();
@@ -1389,7 +1416,7 @@ const handlers = {
       connection.release();
     }
   },
-  'productionProcesses.addInsumo': async ({ id, id_etapa, id_producto, cantidad, unidad_medida, observaciones }) => {
+  'productionProcesses.addInsumo': async ({ id, id_etapa, id_producto, cantidad, unidad_medida, observaciones, id_usuario_modificacion }) => {
     const connection = await pool.getConnection();
 
     try {
@@ -1411,13 +1438,13 @@ const handlers = {
       }
 
       await connection.query(
-        `INSERT INTO ${MOVEMENTS_TABLE} (id_existencia, tipo_movimiento, cantidad, motivo, id_usuario, estado_registro) VALUES (?, 'Salida', ?, ?, NULL, ?)`,
-        [existencia.id_existencia, requestedQty, `Consumo en produccion #${id}`, ACTIVE_STATE]
+        `INSERT INTO ${MOVEMENTS_TABLE} (id_existencia, tipo_movimiento, cantidad, motivo, id_usuario, estado_registro) VALUES (?, 'Salida', ?, ?, ?, ?)`,
+        [existencia.id_existencia, requestedQty, `Consumo en produccion #${id}`, id_usuario_modificacion ?? null, ACTIVE_STATE]
       );
 
       const [result] = await connection.query(
-        `INSERT INTO ${PRODUCTION_INSUMO_TABLE} (id_proceso, id_etapa, id_producto, cantidad, unidad_medida, observaciones, estado_registro) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [id, id_etapa ?? null, id_producto, requestedQty, unidad_medida, normalizeNullableText(observaciones), ACTIVE_STATE]
+        `INSERT INTO ${PRODUCTION_INSUMO_TABLE} (id_proceso, id_etapa, id_producto, cantidad, unidad_medida, observaciones, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, id_etapa ?? null, id_producto, requestedQty, unidad_medida, normalizeNullableText(observaciones), ACTIVE_STATE, id_usuario_modificacion ?? null]
       );
 
       await connection.commit();
@@ -1430,7 +1457,7 @@ const handlers = {
       connection.release();
     }
   },
-  'productionProcesses.addColdRoomEntry': async ({ id, fecha_ingreso, ubicacion_cuarto, cantidad_kg, observaciones }) => {
+  'productionProcesses.addColdRoomEntry': async ({ id, fecha_ingreso, ubicacion_cuarto, cantidad_kg, observaciones, id_usuario_modificacion }) => {
     const connection = await pool.getConnection();
 
     try {
@@ -1443,13 +1470,13 @@ const handlers = {
       }
 
       const [result] = await connection.query(
-        `INSERT INTO ${PRODUCTION_COLD_ROOM_TABLE} (id_proceso, fecha_ingreso, ubicacion_cuarto, cantidad_kg, observaciones, estado_registro) VALUES (?, ?, ?, ?, ?, ?)`,
-        [id, fecha_ingreso, ubicacion_cuarto, cantidad_kg, normalizeNullableText(observaciones), ACTIVE_STATE]
+        `INSERT INTO ${PRODUCTION_COLD_ROOM_TABLE} (id_proceso, fecha_ingreso, ubicacion_cuarto, cantidad_kg, observaciones, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [id, fecha_ingreso, ubicacion_cuarto, cantidad_kg, normalizeNullableText(observaciones), ACTIVE_STATE, id_usuario_modificacion ?? null]
       );
 
       await connection.query(
-        `UPDATE ${PRODUCTION_TABLE} SET cuarto_congelado = COALESCE(?, cuarto_congelado), ubicacion_cuarto_congelado = COALESCE(?, ubicacion_cuarto_congelado) WHERE id_proceso = ?`,
-        [ubicacion_cuarto, ubicacion_cuarto, id]
+        `UPDATE ${PRODUCTION_TABLE} SET cuarto_congelado = COALESCE(?, cuarto_congelado), ubicacion_cuarto_congelado = COALESCE(?, ubicacion_cuarto_congelado), id_usuario_modificacion = ? WHERE id_proceso = ?`,
+        [ubicacion_cuarto, ubicacion_cuarto, id_usuario_modificacion ?? null, id]
       );
 
       await connection.commit();
@@ -1471,6 +1498,7 @@ const handlers = {
     ubicacion_cuarto_congelado,
     observaciones,
     costo_unitario,
+    id_usuario_modificacion,
   }) => {
     const connection = await pool.getConnection();
 
@@ -1506,7 +1534,7 @@ const handlers = {
       const rendimiento = inputKg > 0 ? (outputKg / inputKg) * 100 : 0;
 
       await connection.query(
-        `UPDATE ${PRODUCTION_TABLE} SET cantidad_producida_kg = ?, rendimiento_porcentaje = ?, estado_proceso = '${PRODUCTION_FINISHED_STATE}', fecha_fin = ?, cuarto_congelado = COALESCE(?, cuarto_congelado), ubicacion_cuarto_congelado = COALESCE(?, ubicacion_cuarto_congelado), observaciones = COALESCE(?, observaciones) WHERE id_proceso = ?`,
+        `UPDATE ${PRODUCTION_TABLE} SET cantidad_producida_kg = ?, rendimiento_porcentaje = ?, estado_proceso = '${PRODUCTION_FINISHED_STATE}', fecha_fin = ?, cuarto_congelado = COALESCE(?, cuarto_congelado), ubicacion_cuarto_congelado = COALESCE(?, ubicacion_cuarto_congelado), observaciones = COALESCE(?, observaciones), id_usuario_modificacion = ? WHERE id_proceso = ?`,
         [
           outputKg,
           rendimiento,
@@ -1514,6 +1542,7 @@ const handlers = {
           normalizeNullableText(cuarto_congelado),
           normalizeNullableText(ubicacion_cuarto_congelado),
           normalizeNullableText(observaciones),
+          id_usuario_modificacion ?? null,
           id,
         ]
       );
@@ -1535,20 +1564,20 @@ const handlers = {
         if (existingInventoryRows.length > 0) {
           existenceId = existingInventoryRows[0].id_existencia;
           await connection.query(
-            `UPDATE ${INVENTORY_TABLE} SET id_proveedor = ?, fecha_vencimiento = ?, costo_unitario = COALESCE(?, costo_unitario), estado_registro = '${ACTIVE_STATE}' WHERE id_existencia = ?`,
-            [supplierId, fecha_vencimiento, costo_unitario ?? null, existenceId]
+            `UPDATE ${INVENTORY_TABLE} SET id_proveedor = ?, fecha_vencimiento = ?, costo_unitario = COALESCE(?, costo_unitario), estado_registro = '${ACTIVE_STATE}', id_usuario_modificacion = ? WHERE id_existencia = ?`,
+            [supplierId, fecha_vencimiento, costo_unitario ?? null, id_usuario_modificacion ?? null, existenceId]
           );
         } else {
           const [existenceResult] = await connection.query(
-            `INSERT INTO ${INVENTORY_TABLE} (id_producto, id_proveedor, id_proceso_origen, id_entrada_origen, fecha_vencimiento, cantidad_disponible, costo_unitario, estado_registro) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)`,
-            [process.id_producto_resultado, supplierId, id, fecha_vencimiento, 0, costo_unitario ?? null, ACTIVE_STATE]
+            `INSERT INTO ${INVENTORY_TABLE} (id_producto, id_proveedor, id_proceso_origen, id_entrada_origen, fecha_vencimiento, cantidad_disponible, costo_unitario, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
+            [process.id_producto_resultado, supplierId, id, fecha_vencimiento, 0, costo_unitario ?? null, ACTIVE_STATE, id_usuario_modificacion ?? null]
           );
           existenceId = existenceResult.insertId;
         }
 
         await connection.query(
           `INSERT INTO ${MOVEMENTS_TABLE} (id_existencia, tipo_movimiento, cantidad, motivo, id_usuario, estado_registro) VALUES (?, 'Entrada', ?, ?, ?, ?)`,
-          [existenceId, outputKg, `Produccion finalizada #${id}`, process.id_usuario_registro ?? null, ACTIVE_STATE]
+          [existenceId, outputKg, `Produccion finalizada #${id}`, id_usuario_modificacion ?? process.id_usuario_registro ?? null, ACTIVE_STATE]
         );
       }
 
@@ -1561,10 +1590,10 @@ const handlers = {
       connection.release();
     }
   },
-  'productionProcesses.remove': async ({ id }) => {
+  'productionProcesses.remove': async ({ id, id_usuario_modificacion }) => {
     const [result] = await pool.query(
-      `UPDATE ${PRODUCTION_TABLE} SET estado_registro = '${INACTIVE_STATE}' WHERE id_proceso = ? AND estado_registro <> '${INACTIVE_STATE}'`,
-      [id]
+      `UPDATE ${PRODUCTION_TABLE} SET estado_registro = '${INACTIVE_STATE}', id_usuario_modificacion = ? WHERE id_proceso = ? AND estado_registro <> '${INACTIVE_STATE}'`,
+      [id_usuario_modificacion ?? null, id]
     );
     return result.affectedRows > 0;
   },
@@ -1576,10 +1605,10 @@ const handlers = {
     const [rows] = await pool.query(vehicleQueries.findById, [id]);
     return rows[0] || null;
   },
-  'vehicles.create': async ({ placa, modelo, estado, kilometraje_actual, estado_registro }) => {
+  'vehicles.create': async ({ placa, modelo, estado, kilometraje_actual, estado_registro, id_usuario_modificacion }) => {
     const [result] = await pool.query(
-      `INSERT INTO ${VEHICLES_TABLE} (placa, modelo, estado, kilometraje_actual, estado_registro) VALUES (?, ?, ?, ?, ?)`,
-      [placa, modelo ?? null, estado ?? 'Disponible', kilometraje_actual ?? 0, estado_registro || ACTIVE_STATE]
+      `INSERT INTO ${VEHICLES_TABLE} (placa, modelo, estado, kilometraje_actual, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?)`,
+      [placa, modelo ?? null, estado ?? 'Disponible', kilometraje_actual ?? 0, estado_registro || ACTIVE_STATE, id_usuario_modificacion ?? null]
     );
 
     const [rows] = await pool.query(vehicleQueries.findById, [result.insertId]);
@@ -1617,8 +1646,8 @@ const handlers = {
           : Number(kilometraje_actual);
 
       const [result] = await connection.query(
-        `UPDATE ${VEHICLES_TABLE} SET placa = ?, modelo = ?, estado = ?, kilometraje_actual = ?, estado_registro = COALESCE(?, estado_registro) WHERE id_vehiculo = ? AND estado_registro = '${ACTIVE_STATE}'`,
-        [placa, modelo ?? null, estado ?? 'Disponible', nextMileage, estado_registro ?? null, id]
+        `UPDATE ${VEHICLES_TABLE} SET placa = ?, modelo = ?, estado = ?, kilometraje_actual = ?, estado_registro = COALESCE(?, estado_registro), id_usuario_modificacion = ? WHERE id_vehiculo = ? AND estado_registro = '${ACTIVE_STATE}'`,
+        [placa, modelo ?? null, estado ?? 'Disponible', nextMileage, estado_registro ?? null, id_usuario_modificador ?? null, id]
       );
 
       if (result.affectedRows === 0) {
@@ -1644,10 +1673,10 @@ const handlers = {
       connection.release();
     }
   },
-  'vehicles.remove': async ({ id }) => {
+  'vehicles.remove': async ({ id, id_usuario_modificacion }) => {
     const [result] = await pool.query(
-      `UPDATE ${VEHICLES_TABLE} SET estado_registro = '${INACTIVE_STATE}' WHERE id_vehiculo = ? AND estado_registro = '${ACTIVE_STATE}'`,
-      [id]
+      `UPDATE ${VEHICLES_TABLE} SET estado_registro = '${INACTIVE_STATE}', id_usuario_modificacion = ? WHERE id_vehiculo = ? AND estado_registro = '${ACTIVE_STATE}'`,
+      [id_usuario_modificacion ?? null, id]
     );
     return result.affectedRows > 0;
   },
@@ -1655,10 +1684,10 @@ const handlers = {
     const [rows] = await pool.query(vehicleMileageReportQueries.findAll);
     return rows;
   },
-  'vehicles.remove': async ({ id }) => {
+  'vehicles.remove': async ({ id, id_usuario_modificacion }) => {
     const [result] = await pool.query(
-      `UPDATE ${VEHICLES_TABLE} SET estado_registro = '${INACTIVE_STATE}' WHERE id_vehiculo = ? AND estado_registro = '${ACTIVE_STATE}'`,
-      [id]
+      `UPDATE ${VEHICLES_TABLE} SET estado_registro = '${INACTIVE_STATE}', id_usuario_modificacion = ? WHERE id_vehiculo = ? AND estado_registro = '${ACTIVE_STATE}'`,
+      [id_usuario_modificacion ?? null, id]
     );
     return result.affectedRows > 0;
   },
@@ -1678,9 +1707,10 @@ const handlers = {
     costo_servicio,
     proximo_servicio_km,
     notas,
+    id_usuario_modificacion,
   }) => {
     const [result] = await pool.query(
-      `INSERT INTO ${VEHICLE_SERVICES_TABLE} (id_vehiculo, id_tipo_servicio, fecha_servicio, km_en_servicio, costo_servicio, proximo_servicio_km, notas) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO ${VEHICLE_SERVICES_TABLE} (id_vehiculo, id_tipo_servicio, fecha_servicio, km_en_servicio, costo_servicio, proximo_servicio_km, notas, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id_vehiculo,
         id_tipo_servicio,
@@ -1695,6 +1725,7 @@ const handlers = {
           ? null
           : Number(proximo_servicio_km),
         normalizeNullableText(notas),
+        id_usuario_modificacion ?? null,
       ]
     );
 
@@ -1710,9 +1741,10 @@ const handlers = {
     costo_servicio,
     proximo_servicio_km,
     notas,
+    id_usuario_modificacion,
   }) => {
     const [result] = await pool.query(
-      `UPDATE ${VEHICLE_SERVICES_TABLE} SET id_vehiculo = ?, id_tipo_servicio = ?, fecha_servicio = ?, km_en_servicio = ?, costo_servicio = ?, proximo_servicio_km = ?, notas = ? WHERE id_servicio = ?`,
+      `UPDATE ${VEHICLE_SERVICES_TABLE} SET id_vehiculo = ?, id_tipo_servicio = ?, fecha_servicio = ?, km_en_servicio = ?, costo_servicio = ?, proximo_servicio_km = ?, notas = ?, id_usuario_modificacion = ? WHERE id_servicio = ?`,
       [
         id_vehiculo,
         id_tipo_servicio,
@@ -1727,6 +1759,7 @@ const handlers = {
           ? null
           : Number(proximo_servicio_km),
         normalizeNullableText(notas),
+        id_usuario_modificacion ?? null,
         id,
       ]
     );

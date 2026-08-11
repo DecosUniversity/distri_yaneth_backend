@@ -8,13 +8,14 @@ const findById = async (id) => {
   return enqueueDbJob('vehicles.findById', { id });
 };
 
-const create = async ({ placa, modelo, estado, kilometraje_actual, estado_registro }) => {
+const create = async ({ placa, modelo, estado, kilometraje_actual, estado_registro, id_usuario_modificacion }) => {
   return enqueueDbJob('vehicles.create', {
     placa,
     modelo,
     estado,
     kilometraje_actual,
     estado_registro,
+    id_usuario_modificacion,
   });
 };
 
@@ -33,8 +34,8 @@ const update = async (
   });
 };
 
-const remove = async (id) => {
-  return enqueueDbJob('vehicles.remove', { id });
+const remove = async (id, id_usuario_modificacion) => {
+  return enqueueDbJob('vehicles.remove', { id, id_usuario_modificacion });
 };
 
 module.exports = {

@@ -188,7 +188,10 @@ const createLote = async (req, res, next) => {
       });
     }
 
-    const newLot = await maturationLotModel.create(normalizedPayload);
+    const newLot = await maturationLotModel.create({
+      ...normalizedPayload,
+      id_usuario_modificacion: req.auth?.sub ?? null,
+    });
     return res.status(201).json(newLot);
   } catch (error) {
     return next(error);
@@ -229,7 +232,10 @@ const updateLote = async (req, res, next) => {
       });
     }
 
-    const updatedLot = await maturationLotModel.update(id, normalizedPayload);
+    const updatedLot = await maturationLotModel.update(id, {
+      ...normalizedPayload,
+      id_usuario_modificacion: req.auth?.sub ?? null,
+    });
 
     if (!updatedLot) {
       return res.status(404).json({ message: 'Lote no encontrado' });
@@ -249,7 +255,7 @@ const deleteLote = async (req, res, next) => {
       return res.status(400).json({ message: 'ID invalido' });
     }
 
-    const deleted = await maturationLotModel.remove(id);
+    const deleted = await maturationLotModel.remove(id, req.auth?.sub ?? null);
 
     if (!deleted) {
       return res.status(404).json({ message: 'Lote no encontrado' });
@@ -277,7 +283,10 @@ const acceptLote = async (req, res, next) => {
       });
     }
 
-    const sublote = await maturationLotModel.accept(id, { estado_maduracion: estadoMaduracion });
+    const sublote = await maturationLotModel.accept(id, {
+      estado_maduracion: estadoMaduracion,
+      id_usuario_modificacion: req.auth?.sub ?? null,
+    });
 
     if (!sublote) {
       return res.status(404).json({ message: 'Lote no encontrado o no esta pendiente de aceptacion' });
@@ -359,6 +368,7 @@ const splitSublote = async (req, res, next) => {
     const result = await maturationSublotModel.split(id, {
       peso_kg: pesoKg,
       observaciones: req.body.observaciones,
+      id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
     if (!result) {
@@ -387,6 +397,7 @@ const closeSublote = async (req, res, next) => {
 
     const sublote = await maturationSublotModel.close(id, {
       peso_medido_kg: pesoMedido === null ? undefined : Number(pesoMedido),
+      id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
     if (!sublote) {
@@ -431,7 +442,10 @@ const createControl = async (req, res, next) => {
       return res.status(400).json({ message: validationError });
     }
 
-    const newControl = await maturationControlModel.create(normalizeControlPayload(req.body));
+    const newControl = await maturationControlModel.create({
+      ...normalizeControlPayload(req.body),
+      id_usuario_modificacion: req.auth?.sub ?? null,
+    });
     return res.status(201).json(newControl);
   } catch (error) {
     return next(error);

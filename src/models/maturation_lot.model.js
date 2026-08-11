@@ -19,8 +19,8 @@ const update = async (id, payload) => {
   });
 };
 
-const remove = async (id) => {
-  return enqueueDbJob('maturationLots.remove', { id });
+const remove = async (id, id_usuario_modificacion) => {
+  return enqueueDbJob('maturationLots.remove', { id, id_usuario_modificacion });
 };
 
 const accept = async (id, payload) => {

@@ -16,6 +16,7 @@ const create = async ({
   stock_minimo,
   precio_venta_sugerido,
   estado_registro,
+  id_usuario_modificacion,
 }) => {
   return enqueueDbJob('products.create', {
     nombre,
@@ -25,6 +26,7 @@ const create = async ({
     stock_minimo,
     precio_venta_sugerido,
     estado_registro,
+    id_usuario_modificacion,
   });
 };
 
@@ -38,6 +40,7 @@ const update = async (
     stock_minimo,
     precio_venta_sugerido,
     estado_registro,
+    id_usuario_modificacion,
   }
 ) => {
   return enqueueDbJob('products.update', {
@@ -49,11 +52,12 @@ const update = async (
     stock_minimo,
     precio_venta_sugerido,
     estado_registro,
+    id_usuario_modificacion,
   });
 };
 
-const remove = async (id) => {
-  return enqueueDbJob('products.remove', { id });
+const remove = async (id, id_usuario_modificacion) => {
+  return enqueueDbJob('products.remove', { id, id_usuario_modificacion });
 };
 
 module.exports = {

@@ -8,20 +8,22 @@ const findById = async (id) => {
   return enqueueDbJob('serviceTypes.findById', { id });
 };
 
-const create = async ({ nombre_servicio, descripcion, km_frecuencia }) => {
+const create = async ({ nombre_servicio, descripcion, km_frecuencia, id_usuario_modificacion }) => {
   return enqueueDbJob('serviceTypes.create', {
     nombre_servicio,
     descripcion,
     km_frecuencia,
+    id_usuario_modificacion,
   });
 };
 
-const update = async (id, { nombre_servicio, descripcion, km_frecuencia }) => {
+const update = async (id, { nombre_servicio, descripcion, km_frecuencia, id_usuario_modificacion }) => {
   return enqueueDbJob('serviceTypes.update', {
     id,
     nombre_servicio,
     descripcion,
     km_frecuencia,
+    id_usuario_modificacion,
   });
 };
 

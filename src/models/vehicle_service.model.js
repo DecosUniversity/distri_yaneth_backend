@@ -16,6 +16,7 @@ const create = async ({
   costo_servicio,
   proximo_servicio_km,
   notas,
+  id_usuario_modificacion,
 }) => {
   return enqueueDbJob('vehicleServices.create', {
     id_vehiculo,
@@ -25,6 +26,7 @@ const create = async ({
     costo_servicio,
     proximo_servicio_km,
     notas,
+    id_usuario_modificacion,
   });
 };
 
@@ -38,6 +40,7 @@ const update = async (
     costo_servicio,
     proximo_servicio_km,
     notas,
+    id_usuario_modificacion,
   }
 ) => {
   return enqueueDbJob('vehicleServices.update', {
@@ -49,6 +52,7 @@ const update = async (
     costo_servicio,
     proximo_servicio_km,
     notas,
+    id_usuario_modificacion,
   });
 };
 

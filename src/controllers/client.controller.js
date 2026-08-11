@@ -46,6 +46,7 @@ const createClient = async (req, res, next) => {
       direccion_entrega,
       telefono,
       nit_facturacion,
+      id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
     return res.status(201).json(newClient);
@@ -74,6 +75,7 @@ const updateClient = async (req, res, next) => {
       direccion_entrega,
       telefono,
       nit_facturacion,
+      id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
     if (!updatedClient) {
@@ -94,7 +96,7 @@ const deleteClient = async (req, res, next) => {
       return res.status(400).json({ message: 'ID invalido' });
     }
 
-    const deleted = await clientModel.remove(id);
+    const deleted = await clientModel.remove(id, req.auth?.sub ?? null);
 
     if (!deleted) {
       return res.status(404).json({ message: 'Cliente no encontrado' });

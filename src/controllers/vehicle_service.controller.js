@@ -99,7 +99,10 @@ const createVehicleService = async (req, res, next) => {
       return res.status(400).json({ message: validationError });
     }
 
-    const newVehicleService = await vehicleServiceModel.create(normalizePayload(req.body));
+    const newVehicleService = await vehicleServiceModel.create({
+      ...normalizePayload(req.body),
+      id_usuario_modificacion: req.auth?.sub ?? null,
+    });
     return res.status(201).json(newVehicleService);
   } catch (error) {
     return next(error);
@@ -120,7 +123,10 @@ const updateVehicleService = async (req, res, next) => {
       return res.status(400).json({ message: validationError });
     }
 
-    const updatedVehicleService = await vehicleServiceModel.update(id, normalizePayload(req.body));
+    const updatedVehicleService = await vehicleServiceModel.update(id, {
+      ...normalizePayload(req.body),
+      id_usuario_modificacion: req.auth?.sub ?? null,
+    });
 
     if (!updatedVehicleService) {
       return res.status(404).json({ message: 'Servicio de vehiculo no encontrado' });

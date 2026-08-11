@@ -78,6 +78,7 @@ const createVehicle = async (req, res, next) => {
       modelo,
       estado,
       kilometraje_actual,
+      id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
     return res.status(201).json(newVehicle);
@@ -159,7 +160,7 @@ const deleteVehicle = async (req, res, next) => {
       return res.status(400).json({ message: 'ID invalido' });
     }
 
-    const deleted = await vehicleModel.remove(id);
+    const deleted = await vehicleModel.remove(id, req.auth?.sub ?? null);
 
     if (!deleted) {
       return res.status(404).json({ message: 'Vehiculo no encontrado' });

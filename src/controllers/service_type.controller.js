@@ -62,6 +62,7 @@ const createServiceType = async (req, res, next) => {
       nombre_servicio: req.body.nombre_servicio.trim(),
       descripcion: req.body.descripcion,
       km_frecuencia: req.body.km_frecuencia,
+      id_usuario_modificacion: req.auth?.sub ?? null,
     };
 
     const newServiceType = await serviceTypeModel.create(payload);
@@ -89,6 +90,7 @@ const updateServiceType = async (req, res, next) => {
       nombre_servicio: req.body.nombre_servicio.trim(),
       descripcion: req.body.descripcion,
       km_frecuencia: req.body.km_frecuencia,
+      id_usuario_modificacion: req.auth?.sub ?? null,
     };
 
     const updatedServiceType = await serviceTypeModel.update(id, payload);

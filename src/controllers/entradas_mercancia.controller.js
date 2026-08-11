@@ -134,7 +134,7 @@ const deleteEntradaMercancia = async (req, res, next) => {
       return res.status(400).json({ message: 'ID invalido' });
     }
 
-    const deleted = await entradasMercanciaModel.remove(id);
+    const deleted = await entradasMercanciaModel.remove(id, req.auth?.sub ?? null);
 
     if (!deleted) {
       return res.status(404).json({ message: 'Entrada no encontrada' });

@@ -88,6 +88,7 @@ const createProduct = async (req, res, next) => {
       tipo_producto,
       stock_minimo,
       precio_venta_sugerido,
+      id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
     return res.status(201).json(newProduct);
@@ -126,6 +127,7 @@ const updateProduct = async (req, res, next) => {
       tipo_producto,
       stock_minimo,
       precio_venta_sugerido,
+      id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
     if (!updatedProduct) {
@@ -146,7 +148,7 @@ const deleteProduct = async (req, res, next) => {
       return res.status(400).json({ message: 'ID invalido' });
     }
 
-    const deleted = await productModel.remove(id);
+    const deleted = await productModel.remove(id, req.auth?.sub ?? null);
 
     if (!deleted) {
       return res.status(404).json({ message: 'Producto no encontrado' });

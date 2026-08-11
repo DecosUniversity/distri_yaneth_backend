@@ -44,6 +44,7 @@ const createProvider = async (req, res, next) => {
       nit,
       contacto_nombre,
       telefono,
+      id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
     return res.status(201).json(newProvider);
@@ -71,6 +72,7 @@ const updateProvider = async (req, res, next) => {
       nit,
       contacto_nombre,
       telefono,
+      id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
     if (!updatedProvider) {
@@ -91,7 +93,7 @@ const deleteProvider = async (req, res, next) => {
       return res.status(400).json({ message: 'ID invalido' });
     }
 
-    const deleted = await providerModel.remove(id);
+    const deleted = await providerModel.remove(id, req.auth?.sub ?? null);
 
     if (!deleted) {
       return res.status(404).json({ message: 'Proveedor no encontrado' });

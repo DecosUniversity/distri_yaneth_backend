@@ -55,8 +55,8 @@ const finalize = async (id, payload) => {
   });
 };
 
-const remove = async (id) => {
-  return enqueueDbJob('productionProcesses.remove', { id });
+const remove = async (id, id_usuario_modificacion) => {
+  return enqueueDbJob('productionProcesses.remove', { id, id_usuario_modificacion });
 };
 
 module.exports = {

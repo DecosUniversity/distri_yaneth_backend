@@ -282,6 +282,7 @@ const addEtapa = async (req, res, next) => {
       fecha_inicio: formatDateTime(req.body.fecha_inicio),
       cantidad_entrada_kg: emptyToNull(req.body.cantidad_entrada_kg) === null ? null : Number(req.body.cantidad_entrada_kg),
       observaciones: req.body.observaciones,
+      id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
     if (!stage) {
@@ -319,6 +320,7 @@ const updateEtapa = async (req, res, next) => {
       cantidad_salida_kg: emptyToNull(req.body.cantidad_salida_kg) === null ? null : Number(req.body.cantidad_salida_kg),
       merma_kg: emptyToNull(req.body.merma_kg) === null ? null : Number(req.body.merma_kg),
       observaciones: req.body.observaciones,
+      id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
     if (!stage) {
@@ -350,6 +352,7 @@ const addMerma = async (req, res, next) => {
       id_tipo_merma: parseId(req.body.id_tipo_merma),
       cantidad_kg: Number(req.body.cantidad_kg),
       observaciones: req.body.observaciones,
+      id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
     if (!merma) {
@@ -393,6 +396,7 @@ const addInsumo = async (req, res, next) => {
       cantidad: Number(req.body.cantidad),
       unidad_medida: String(req.body.unidad_medida).trim(),
       observaciones: req.body.observaciones,
+      id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
     if (!insumo) {
@@ -424,6 +428,7 @@ const addColdRoomEntry = async (req, res, next) => {
       ubicacion_cuarto: String(req.body.ubicacion_cuarto).trim(),
       cantidad_kg: Number(req.body.cantidad_kg),
       observaciones: req.body.observaciones,
+      id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
     if (!coldRoom) {
@@ -458,6 +463,7 @@ const finalizeProceso = async (req, res, next) => {
       ubicacion_cuarto_congelado: req.body.ubicacion_cuarto_congelado,
       observaciones: req.body.observaciones,
       costo_unitario: emptyToNull(req.body.costo_unitario) === null ? null : Number(req.body.costo_unitario),
+      id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
     if (!finalized) {
@@ -478,7 +484,7 @@ const deleteProceso = async (req, res, next) => {
       return res.status(400).json({ message: 'ID invalido' });
     }
 
-    const deleted = await productionModel.remove(id);
+    const deleted = await productionModel.remove(id, req.auth?.sub ?? null);
 
     if (!deleted) {
       return res.status(404).json({ message: 'Proceso no encontrado' });
