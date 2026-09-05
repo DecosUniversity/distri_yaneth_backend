@@ -6,12 +6,16 @@ const FINISHED_PRODUCT_TYPE = 'Producto Terminado';
 const BUSINESS_RULE_MESSAGES = [
   'El sub-lote debe estar Verde y activo para empacar como red',
   'El peso de la red supera el peso disponible del sub-lote',
+  'Debes registrar al menos una caja',
 ];
 
 const emptyToNull = (value) => (value === undefined || value === null || value === '' ? null : value);
 
 const handleGreenNetError = (error, res, next) => {
-  if (BUSINESS_RULE_MESSAGES.includes(error.message)) {
+  if (
+    BUSINESS_RULE_MESSAGES.includes(error.message) ||
+    /^La caja \d+ debe tener/.test(error.message)
+  ) {
     return res.status(400).json({ message: error.message });
   }
 
@@ -46,7 +50,7 @@ const createRed = async (req, res, next) => {
   try {
     const idSublote = parseId(req.body.id_sublote);
     const idProducto = parseId(req.body.id_producto);
-    const pesoKg = Number(req.body.peso_kg);
+    const cajas = Array.isArray(req.body.cajas) ? req.body.cajas : null;
 
     if (Number.isNaN(idSublote) || idSublote <= 0) {
       return res.status(400).json({ message: 'id_sublote es obligatorio y debe ser valido' });
@@ -56,8 +60,8 @@ const createRed = async (req, res, next) => {
       return res.status(400).json({ message: 'id_producto es obligatorio y debe ser valido' });
     }
 
-    if (Number.isNaN(pesoKg) || pesoKg <= 0) {
-      return res.status(400).json({ message: 'peso_kg debe ser mayor a 0' });
+    if (!cajas || cajas.length === 0) {
+      return res.status(400).json({ message: 'Debes registrar al menos una caja' });
     }
 
     if (!req.body.fecha_vencimiento) {
@@ -74,20 +78,23 @@ const createRed = async (req, res, next) => {
       return res.status(400).json({ message: 'El producto debe ser de tipo Producto Terminado' });
     }
 
-    const red = await greenNetModel.create({
+    const redes = await greenNetModel.create({
       id_sublote: idSublote,
       id_producto: idProducto,
-      peso_kg: pesoKg,
+      cajas: cajas.map((caja) => ({
+        cantidad_redes: caja.cantidad_redes,
+        peso_kg: caja.peso_kg,
+      })),
       fecha_vencimiento: String(req.body.fecha_vencimiento).slice(0, 10),
       costo_unitario: emptyToNull(req.body.costo_unitario) === null ? null : Number(req.body.costo_unitario),
       id_usuario: req.auth?.sub || null,
     });
 
-    if (!red) {
+    if (!redes) {
       return res.status(404).json({ message: 'Sub-lote no encontrado' });
     }
 
-    return res.status(201).json(red);
+    return res.status(201).json(redes);
   } catch (error) {
     return handleGreenNetError(error, res, next);
   }

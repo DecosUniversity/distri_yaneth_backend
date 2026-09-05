@@ -4,7 +4,6 @@ const maturationSublotModel = require('../models/maturation_sublot.model');
 
 const parseId = (value) => Number.parseInt(value, 10);
 
-const PRODUCTION_STAGES = ['Pelado', 'Corte', 'Fritura', 'Embalaje'];
 const FINISHED_PRODUCT_TYPE = 'Producto Terminado';
 const INSUMO_PRODUCT_TYPE = 'Insumo';
 const SUBLOT_READY_STATE = 'Listo para produccion';
@@ -25,10 +24,16 @@ const BUSINESS_RULE_MESSAGES = [
   'La cantidad producida no es valida',
   'La cantidad producida no puede superar la cantidad ingresada',
   'No hay suficiente inventario disponible para el insumo seleccionado',
+  'El proceso ya fue finalizado y no puede revertirse',
+  'Debes declarar el peso a revertir cuando el proceso ya tiene etapas, mermas o insumos registrados',
+  'Debes justificar la reversion cuando el proceso ya tiene trabajo registrado',
+  'La orden de produccion seleccionada no existe',
+  'La orden de produccion ya no esta disponible (Completada o Cancelada)',
+  'El producto del proceso no coincide con el producto de la orden de produccion',
 ];
 
 const handleProductionError = (error, res, next) => {
-  if (BUSINESS_RULE_MESSAGES.includes(error.message)) {
+  if (BUSINESS_RULE_MESSAGES.includes(error.message) || error.message.startsWith('El peso no cuadra')) {
     return res.status(400).json({ message: error.message });
   }
 
@@ -52,6 +57,14 @@ const validateProcessPayload = (payload) => {
     return 'cantidad_ingresada_kg debe ser mayor a 0';
   }
 
+  if (payload.id_orden !== undefined && payload.id_orden !== null && payload.id_orden !== '') {
+    const orderId = parseId(payload.id_orden);
+
+    if (Number.isNaN(orderId) || orderId <= 0) {
+      return 'id_orden debe ser valido si se especifica';
+    }
+  }
+
   return null;
 };
 
@@ -61,11 +74,11 @@ const isPositiveInteger = (value) => {
 };
 
 const validateStagePayload = (payload) => {
-  const stage = String(payload.nombre_etapa || '').trim();
+  const stageTypeId = parseId(payload.id_tipo_etapa);
   const quantityIn = emptyToNull(payload.cantidad_entrada_kg);
 
-  if (!PRODUCTION_STAGES.includes(stage)) {
-    return `nombre_etapa invalido. Valores permitidos: ${PRODUCTION_STAGES.join(', ')}`;
+  if (Number.isNaN(stageTypeId) || stageTypeId <= 0) {
+    return 'id_tipo_etapa es obligatorio y debe ser valido';
   }
 
   if (!payload.fecha_inicio) {
@@ -84,13 +97,11 @@ const validateStagePayload = (payload) => {
 };
 
 const validateStageUpdatePayload = (payload) => {
-  const stage = String(payload.nombre_etapa || '').trim();
+  const stageTypeId = parseId(payload.id_tipo_etapa);
   const quantityIn = emptyToNull(payload.cantidad_entrada_kg);
-  const quantityOut = emptyToNull(payload.cantidad_salida_kg);
-  const merma = emptyToNull(payload.merma_kg);
 
-  if (!PRODUCTION_STAGES.includes(stage)) {
-    return `nombre_etapa invalido. Valores permitidos: ${PRODUCTION_STAGES.join(', ')}`;
+  if (Number.isNaN(stageTypeId) || stageTypeId <= 0) {
+    return 'id_tipo_etapa es obligatorio y debe ser valido';
   }
 
   if (!payload.fecha_inicio) {
@@ -103,14 +114,6 @@ const validateStageUpdatePayload = (payload) => {
 
   if (quantityIn !== null && Number.isNaN(Number(quantityIn))) {
     return 'cantidad_entrada_kg debe ser numerica';
-  }
-
-  if (quantityOut !== null && Number.isNaN(Number(quantityOut))) {
-    return 'cantidad_salida_kg debe ser numerica';
-  }
-
-  if (merma !== null && Number.isNaN(Number(merma))) {
-    return 'merma_kg debe ser numerica';
   }
 
   return null;
@@ -195,6 +198,24 @@ const getProcesos = async (_req, res, next) => {
   }
 };
 
+const getReporteMermasPorCategoria = async (_req, res, next) => {
+  try {
+    const report = await productionModel.reportMermasPorCategoria();
+    return res.status(200).json(report);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const getReporteProduccionPorProducto = async (_req, res, next) => {
+  try {
+    const report = await productionModel.reportProduccionPorProducto();
+    return res.status(200).json(report);
+  } catch (error) {
+    return next(error);
+  }
+};
+
 const getProcesoById = async (req, res, next) => {
   try {
     const id = parseId(req.params.id);
@@ -226,6 +247,10 @@ const createProceso = async (req, res, next) => {
     const payload = {
       id_sublote: parseId(req.body.id_sublote),
       id_producto_resultado: parseId(req.body.id_producto_resultado),
+      id_orden:
+        req.body.id_orden !== undefined && req.body.id_orden !== null && req.body.id_orden !== ''
+          ? parseId(req.body.id_orden)
+          : null,
       cantidad_ingresada_kg: Number(req.body.cantidad_ingresada_kg),
       fecha_inicio: formatDateTime(req.body.fecha_inicio) || undefined,
       cuarto_congelado: req.body.cuarto_congelado,
@@ -276,7 +301,7 @@ const addEtapa = async (req, res, next) => {
     }
 
     const stage = await productionModel.addStage(id, {
-      nombre_etapa: String(req.body.nombre_etapa).trim(),
+      id_tipo_etapa: parseId(req.body.id_tipo_etapa),
       cantidad_personas: Number.parseInt(req.body.cantidad_personas, 10),
       personal_asignado: req.body.personal_asignado,
       fecha_inicio: formatDateTime(req.body.fecha_inicio),
@@ -311,14 +336,12 @@ const updateEtapa = async (req, res, next) => {
     }
 
     const stage = await productionModel.updateStage(id, idEtapa, {
-      nombre_etapa: String(req.body.nombre_etapa).trim(),
+      id_tipo_etapa: parseId(req.body.id_tipo_etapa),
       cantidad_personas: Number.parseInt(req.body.cantidad_personas, 10),
       personal_asignado: req.body.personal_asignado,
       fecha_inicio: formatDateTime(req.body.fecha_inicio),
       fecha_fin: formatDateTime(req.body.fecha_fin),
       cantidad_entrada_kg: emptyToNull(req.body.cantidad_entrada_kg) === null ? null : Number(req.body.cantidad_entrada_kg),
-      cantidad_salida_kg: emptyToNull(req.body.cantidad_salida_kg) === null ? null : Number(req.body.cantidad_salida_kg),
-      merma_kg: emptyToNull(req.body.merma_kg) === null ? null : Number(req.body.merma_kg),
       observaciones: req.body.observaciones,
       id_usuario_modificacion: req.auth?.sub ?? null,
     });
@@ -463,6 +486,7 @@ const finalizeProceso = async (req, res, next) => {
       ubicacion_cuarto_congelado: req.body.ubicacion_cuarto_congelado,
       observaciones: req.body.observaciones,
       costo_unitario: emptyToNull(req.body.costo_unitario) === null ? null : Number(req.body.costo_unitario),
+      justificacion_diferencia: req.body.justificacion_diferencia,
       id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
@@ -496,6 +520,27 @@ const deleteProceso = async (req, res, next) => {
   }
 };
 
+const revertProceso = async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ message: 'ID invalido' });
+    }
+
+    const { peso_a_revertir, justificacion_reversion } = req.body || {};
+    const reverted = await productionModel.revert(id, peso_a_revertir, justificacion_reversion, req.auth?.sub ?? null);
+
+    if (!reverted) {
+      return res.status(404).json({ message: 'Proceso no encontrado' });
+    }
+
+    return res.status(200).json({ message: 'Proceso revertido: el sub-lote vuelve a Listo para produccion' });
+  } catch (error) {
+    return handleProductionError(error, res, next);
+  }
+};
+
 module.exports = {
   getProcesos,
   getProcesoById,
@@ -507,4 +552,7 @@ module.exports = {
   addColdRoomEntry,
   finalizeProceso,
   deleteProceso,
+  revertProceso,
+  getReporteMermasPorCategoria,
+  getReporteProduccionPorProducto,
 };

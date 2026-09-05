@@ -34,7 +34,7 @@ const getClientById = async (req, res, next) => {
 
 const createClient = async (req, res, next) => {
   try {
-    const { nombre_comercial, direccion_entrega, telefono, nit_facturacion } = req.body;
+    const { nombre_comercial, departamento, municipio, zona, direccion_entrega, telefono, nit_facturacion } = req.body;
     const normalizedNombreComercial = normalizeRequiredText(nombre_comercial);
 
     if (!normalizedNombreComercial) {
@@ -43,6 +43,9 @@ const createClient = async (req, res, next) => {
 
     const newClient = await clientModel.create({
       nombre_comercial: normalizedNombreComercial,
+      departamento,
+      municipio,
+      zona,
       direccion_entrega,
       telefono,
       nit_facturacion,
@@ -63,7 +66,7 @@ const updateClient = async (req, res, next) => {
       return res.status(400).json({ message: 'ID invalido' });
     }
 
-    const { nombre_comercial, direccion_entrega, telefono, nit_facturacion } = req.body;
+    const { nombre_comercial, departamento, municipio, zona, direccion_entrega, telefono, nit_facturacion } = req.body;
     const normalizedNombreComercial = normalizeRequiredText(nombre_comercial);
 
     if (!normalizedNombreComercial) {
@@ -72,6 +75,9 @@ const updateClient = async (req, res, next) => {
 
     const updatedClient = await clientModel.update(id, {
       nombre_comercial: normalizedNombreComercial,
+      departamento,
+      municipio,
+      zona,
       direccion_entrega,
       telefono,
       nit_facturacion,

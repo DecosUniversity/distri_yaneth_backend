@@ -29,8 +29,14 @@ const enqueueDbJob = async (name, payload) => {
   return job.waitUntilFinished(dbQueueEvents, 60000);
 };
 
+const closeDbQueue = async () => {
+  await dbQueueEvents.close();
+  await dbQueue.close();
+};
+
 module.exports = {
   DB_QUEUE_NAME,
   ensureDbQueueReady,
   enqueueDbJob,
+  closeDbQueue,
 };

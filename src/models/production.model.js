@@ -4,6 +4,14 @@ const findAll = async () => {
   return enqueueDbJob('productionProcesses.findAll', {});
 };
 
+const reportMermasPorCategoria = async () => {
+  return enqueueDbJob('productionProcesses.reportMermasPorCategoria', {});
+};
+
+const reportProduccionPorProducto = async () => {
+  return enqueueDbJob('productionProcesses.reportProduccionPorProducto', {});
+};
+
 const findById = async (id) => {
   return enqueueDbJob('productionProcesses.findById', { id });
 };
@@ -59,6 +67,15 @@ const remove = async (id, id_usuario_modificacion) => {
   return enqueueDbJob('productionProcesses.remove', { id, id_usuario_modificacion });
 };
 
+const revert = async (id, peso_a_revertir, justificacion_reversion, id_usuario_modificacion) => {
+  return enqueueDbJob('productionProcesses.revert', {
+    id,
+    peso_a_revertir,
+    justificacion_reversion,
+    id_usuario_modificacion,
+  });
+};
+
 module.exports = {
   findAll,
   findById,
@@ -70,4 +87,7 @@ module.exports = {
   addColdRoomEntry,
   finalize,
   remove,
+  revert,
+  reportMermasPorCategoria,
+  reportProduccionPorProducto,
 };

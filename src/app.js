@@ -15,6 +15,11 @@ const serviceTypeRoutes = require('./routes/service_type.routes');
 const vehicleRoutes = require('./routes/vehicle.routes');
 const vehicleServiceRoutes = require('./routes/vehicle_service.routes');
 const vehicleMileageReportRoutes = require('./routes/vehicle_mileage_report.routes');
+const orderRoutes = require('./routes/order.routes');
+const routeRoutes = require('./routes/route.routes');
+const orderReturnRoutes = require('./routes/order_return.routes');
+const auditRoutes = require('./routes/audit.routes');
+const traceabilityRoutes = require('./routes/traceability.routes');
 const { authenticateToken, authorizeRoles } = require('./middlewares/auth.middleware');
 
 const app = express();
@@ -31,7 +36,7 @@ app.use('/api/users', userRoutes);
 app.use(
   '/api/proveedores',
   authenticateToken,
-  authorizeRoles('Administrador', 'Logistica'),
+  authorizeRoles('Administrador', 'Produccion', 'Logistica'),
   providerRoutes
 );
 app.use(
@@ -43,7 +48,7 @@ app.use(
 app.use(
   '/api/entradas-mercancia',
   authenticateToken,
-  authorizeRoles('Administrador', 'Logistica'),
+  authorizeRoles('Administrador', 'Produccion', 'Logistica'),
   entradasMercanciaRoutes
 );
 app.use(
@@ -97,6 +102,36 @@ app.use(
   authenticateToken,
   authorizeRoles('Administrador', 'Logistica', 'Piloto'),
   vehicleMileageReportRoutes
+);
+app.use(
+  '/api/pedidos',
+  authenticateToken,
+  authorizeRoles('Administrador', 'Logistica', 'Piloto'),
+  orderRoutes
+);
+app.use(
+  '/api/rutas',
+  authenticateToken,
+  authorizeRoles('Administrador', 'Logistica', 'Piloto'),
+  routeRoutes
+);
+app.use(
+  '/api/devoluciones',
+  authenticateToken,
+  authorizeRoles('Administrador', 'Logistica', 'Piloto', 'Produccion'),
+  orderReturnRoutes
+);
+app.use(
+  '/api/auditoria',
+  authenticateToken,
+  authorizeRoles('Administrador'),
+  auditRoutes
+);
+app.use(
+  '/api/trazabilidad',
+  authenticateToken,
+  authorizeRoles('Administrador', 'Produccion', 'Logistica'),
+  traceabilityRoutes
 );
 
 app.use((req, res) => {
