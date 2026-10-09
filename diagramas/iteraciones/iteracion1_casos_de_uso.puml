@@ -1,0 +1,38 @@
+@startuml iteracion1_casos_de_uso
+' Iteración 1 - Módulo de Seguridad y Gestión de Usuarios (REQ001 / CU001)
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam actorStyle hollow
+left to right direction
+skinparam actor {
+  BorderColor #4D4D4D
+  BackgroundColor #F2F2F2
+}
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+  ArrowColor #4D4D4D
+}
+skinparam rectangle {
+  BorderColor #4D4D4D
+  BackgroundColor #FFFFFF
+}
+
+actor "Usuario" as U
+actor "Administrador" as A
+
+rectangle "**//Módulo de Seguridad y Gestión de Usuarios//**" {
+  usecase "Iniciar Sesión" as UC_Login
+  usecase "Validar Credenciales y Rol" as UC_Val
+  usecase "Cerrar Sesión" as UC_Logout
+  usecase "Gestionar Usuarios\n(crear, editar, activar / inactivar)" as UC_Gest
+  usecase "Asignar Rol y Permisos de Acceso" as UC_Rol
+}
+
+U --> UC_Login
+U --> UC_Logout
+A --> UC_Gest
+A --> UC_Rol
+UC_Login --> UC_Val
+
+@enduml

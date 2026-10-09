@@ -1,6 +1,9 @@
 const productModel = require('../models/product.model');
+const stageTypeModel = require('../models/stage_type.model');
+const { parseId: parseStageId, validateEtapasPayload } = require('../utils/stage_recipe_validation');
 
 const PRODUCT_TYPES = ['Materia Prima', 'Producto Terminado', 'Insumo', 'Venta Directa'];
+const FINISHED_PRODUCT_TYPE = 'Producto Terminado';
 
 const parseId = (value) => Number.parseInt(value, 10);
 
@@ -80,6 +83,41 @@ const createProduct = async (req, res, next) => {
       stock_minimo,
       precio_venta_sugerido,
     } = req.body;
+
+    // Un producto de tipo Producto Terminado no puede existir sin un plan de etapas (que
+    // etapas de produccion debe cumplir para considerarse completo): se exige y valida aqui,
+    // y se crea junto con el producto en una sola operacion atomica.
+    if (tipo_producto === FINISHED_PRODUCT_TYPE) {
+      const etapas = req.body?.etapas ?? [];
+      const etapasError = validateEtapasPayload(etapas, { requireNonEmpty: true });
+
+      if (etapasError) {
+        return res.status(400).json({ message: etapasError });
+      }
+
+      const normalizedEtapas = etapas.map((value) => parseStageId(value));
+
+      for (const idTipoEtapa of normalizedEtapas) {
+        const stageType = await stageTypeModel.findById(idTipoEtapa);
+
+        if (!stageType) {
+          return res.status(404).json({ message: `Tipo de etapa #${idTipoEtapa} no encontrado` });
+        }
+      }
+
+      const newProduct = await productModel.createWithStageRequirements({
+        nombre,
+        descripcion,
+        unidad_medida,
+        tipo_producto,
+        stock_minimo,
+        precio_venta_sugerido,
+        etapas: normalizedEtapas,
+        id_usuario_modificacion: req.auth?.sub ?? null,
+      });
+
+      return res.status(201).json(newProduct);
+    }
 
     const newProduct = await productModel.create({
       nombre,

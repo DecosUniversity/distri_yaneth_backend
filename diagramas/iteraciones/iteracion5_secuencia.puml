@@ -1,0 +1,44 @@
+@startuml iteracion5_secuencia
+' Iteración 5 - Secuencia: consulta del dashboard y generación de reportes
+skinparam shadowing false
+skinparam actorStyle hollow
+skinparam sequence {
+  ArrowColor #4D4D4D
+  LifeLineBorderColor #4D4D4D
+  LifeLineBackgroundColor #F7F7F7
+  ParticipantBorderColor #4D4D4D
+  ParticipantBackgroundColor #FFFFFF
+  ActorBorderColor #4D4D4D
+  ActorBackgroundColor #F2F2F2
+}
+skinparam databaseBorderColor #4D4D4D
+skinparam databaseBackgroundColor #FFFFFF
+skinparam queueBorderColor #4D4D4D
+skinparam queueBackgroundColor #FFFFFF
+
+actor "Gerencia" as G
+participant "Cliente Web" as CW
+participant "API REST" as API
+queue "Cola de Trabajos\n(BullMQ / Redis)" as Q
+participant "Worker" as W
+database "Base de Datos\n(MySQL)" as DB
+
+G -> CW : Abre el dashboard y aplica filtros (fecha, cliente, tipo de merma)
+CW -> API : Solicita indicadores filtrados
+API -> DB : Consulta producción, mermas y logística
+DB --> API : Resultados
+API --> CW : Actualiza las gráficas en pantalla
+
+G -> CW : Solicita reporte detallado\n(inventario valorizado, trazabilidad de lote o eficiencia de flota)
+CW -> API : Solicita la generación del reporte
+API -> Q : Encola el cálculo del reporte
+Q -> W : Procesa la tarea
+W -> DB : Calcula costos y consolida los datos
+W --> API : Reporte listo
+
+alt La gerencia exporta el reporte
+  G -> CW : Exporta a PDF / Excel
+  CW --> G : Entrega el archivo generado
+end
+
+@enduml

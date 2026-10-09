@@ -1,7 +1,6 @@
 const { pool, resetDatabase, seedBaseline } = require('../helpers/db');
 const { handlers: entryHandlers } = require('../../src/workers/domains/entradas_mercancia.worker.js');
 const { handlers: maturationHandlers } = require('../../src/workers/domains/maturation.worker.js');
-const { handlers: greenNetHandlers } = require('../../src/workers/domains/green_net.worker.js');
 const { handlers: productionHandlers } = require('../../src/workers/domains/production.worker.js');
 const { handlers: orderHandlers } = require('../../src/workers/domains/order.worker.js');
 const { handlers: traceHandlers } = require('../../src/workers/domains/traceability.worker.js');
@@ -42,13 +41,39 @@ const buildFullChain = async () => {
     id_usuario_modificacion: baseline.idUsuario,
   });
 
-  const [red] = await greenNetHandlers['greenNets.create']({
-    id_sublote: subloteParaRed.id_sublote,
-    id_producto: baseline.idProductoTerminado,
-    cajas: [{ cantidad_redes: 25, peso_kg: 50 }],
-    fecha_vencimiento: '2027-01-01',
-    id_usuario: baseline.idUsuario,
-  });
+  // El empaque de redes se estandarizo dentro de Produccion (ver production_green_pack.test.js
+  // para ese flujo nuevo); redes_verde_detalle solo queda como historico de antes de ese
+  // cambio, asi que aqui se siembra directo por SQL, igual que lo hacia el handler retirado
+  // (greenNets.create), para seguir probando que ese historico sigue siendo trazable.
+  const [existenciaRedResult] = await pool.query(
+    `INSERT INTO inventario_existencias (id_producto, id_proveedor, fecha_vencimiento, cantidad_disponible, estado_registro)
+     VALUES (?, ?, '2027-01-01', 50, 'Activo')`,
+    [baseline.idProductoTerminado, baseline.idProveedor]
+  );
+  const idExistenciaRed = existenciaRedResult.insertId;
+
+  await pool.query(
+    `INSERT INTO movimientos_inventario (id_existencia, tipo_movimiento, cantidad, motivo, estado_registro)
+     VALUES (?, 'Entrada', 50, 'Red platano verde (fixture historico)', 'Activo')`,
+    [idExistenciaRed]
+  );
+
+  const [redResult] = await pool.query(
+    `INSERT INTO redes_verde_detalle (id_sublote, id_existencia, peso_kg, cantidad_redes, id_usuario)
+     VALUES (?, ?, 50, 25, ?)`,
+    [subloteParaRed.id_sublote, idExistenciaRed, baseline.idUsuario]
+  );
+
+  await pool.query(
+    `UPDATE sublotes_maduracion SET peso_kg = 0, estado_registro = 'Derivado a red' WHERE id_sublote = ?`,
+    [subloteParaRed.id_sublote]
+  );
+
+  const [redRows] = await pool.query(
+    'SELECT id_red, id_sublote, id_existencia, peso_kg, cantidad_redes FROM redes_verde_detalle WHERE id_red = ?',
+    [redResult.insertId]
+  );
+  const red = redRows[0];
 
   const subloteParaProduccion = await maturationHandlers['maturationSublots.close']({
     id: subloteOrigen.id_sublote,

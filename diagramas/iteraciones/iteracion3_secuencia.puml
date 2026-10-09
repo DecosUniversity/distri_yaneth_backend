@@ -1,0 +1,44 @@
+@startuml iteracion3_secuencia
+' Iteración 3 - Secuencia: registro de etapas de producción y cálculo de rendimiento
+skinparam shadowing false
+skinparam actorStyle hollow
+skinparam sequence {
+  ArrowColor #4D4D4D
+  LifeLineBorderColor #4D4D4D
+  LifeLineBackgroundColor #F7F7F7
+  ParticipantBorderColor #4D4D4D
+  ParticipantBackgroundColor #FFFFFF
+  ActorBorderColor #4D4D4D
+  ActorBackgroundColor #F2F2F2
+}
+skinparam databaseBorderColor #4D4D4D
+skinparam databaseBackgroundColor #FFFFFF
+skinparam queueBorderColor #4D4D4D
+skinparam queueBackgroundColor #FFFFFF
+
+actor "Operador de Producción" as Op
+participant "Cliente Web" as CW
+participant "API REST" as API
+queue "Cola de Trabajos\n(BullMQ / Redis)" as Q
+participant "Worker" as W
+database "Base de Datos\n(MySQL)" as DB
+
+Op -> CW : Selecciona sub-lote "Listo para Proceso"
+CW -> API : Inicia la producción del sub-lote
+API -> DB : Crea el registro de producción
+
+loop Por cada etapa (Pelado, Corte, Fritura, Empaque)
+  Op -> CW : Registra tiempos, personal y mermas de la etapa
+  CW -> API : Envía datos de la etapa
+  API -> Q : Encola el guardado
+  Q -> W : Procesa la tarea
+  W -> DB : Guarda la etapa y acumula mermas
+end
+
+Op -> CW : Registra consumo de insumos e ingreso a congelado
+CW -> API : Envía datos finales
+API -> W : Calcula rendimiento neto y balance de masa
+W -> DB : Actualiza inventario y rendimiento del sub-lote
+API --> CW : Muestra el rendimiento calculado
+
+@enduml

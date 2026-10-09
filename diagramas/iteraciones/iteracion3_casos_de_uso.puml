@@ -1,0 +1,42 @@
+@startuml iteracion3_casos_de_uso
+' Iteración 3 - Módulo de Producción (REQ003 / CU003)
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam actorStyle hollow
+left to right direction
+skinparam actor {
+  BorderColor #4D4D4D
+  BackgroundColor #F2F2F2
+}
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+  ArrowColor #4D4D4D
+}
+skinparam rectangle {
+  BorderColor #4D4D4D
+  BackgroundColor #FFFFFF
+}
+
+actor "Operador de Producción" as Op
+actor "Administrador" as A
+
+rectangle "**//Módulo de Producción//**" {
+  usecase "Iniciar Producción de Sub-lote" as UC_Ini
+  usecase "Registrar Etapa\n(Pelado, Corte, Fritura, Empaque)" as UC_Etapa
+  usecase "Declarar Mermas por Etapa" as UC_Merma
+  usecase "Gestionar Catálogos de Etapas y Mermas\n(dinámicos, ampliables)" as UC_Cat
+  usecase "Registrar Consumo de Insumos\ne Ingreso a Cuarto de Congelado" as UC_Insumos
+  usecase "Calcular Rendimiento y Balance de Masa" as UC_Rend
+  usecase "Generar Plátano Verde en Red\n(sub-lotes verdes)" as UC_Red
+}
+
+Op --> UC_Ini
+Op --> UC_Insumos
+Op --> UC_Red
+A --> UC_Cat
+UC_Ini --> UC_Etapa
+UC_Ini --> UC_Merma
+UC_Ini --> UC_Rend
+
+@enduml

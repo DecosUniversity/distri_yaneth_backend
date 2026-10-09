@@ -1,0 +1,33 @@
+@startuml iteracion2_estados
+' Iteración 2 - Estados del lote / sub-lote de materia prima
+skinparam shadowing false
+skinparam state {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+  ArrowColor #4D4D4D
+  FontColor #000000
+}
+
+[*] --> EnEspera
+
+state "En Espera" as EnEspera
+state "En Proceso\n(maduración)" as EnProceso
+state "Listo para Proceso" as Listo
+state "Procesado" as Procesado
+state "Rechazado" as Rechazado
+
+EnEspera --> EnProceso : Registro de pesaje\ny peso neto completo
+EnProceso --> EnProceso : Muestreo periódico\n(Brix / Materia Seca)
+EnProceso --> Listo : Sub-lote alcanza el\numbral técnico de maduración
+EnProceso --> Rechazado : Métricas fuera de rango\n(inmadura o sobremadura)
+Listo --> Procesado : Administrador autoriza el\ntraslado al módulo de producción
+Procesado --> [*]
+Rechazado --> [*]
+
+note right of EnProceso
+  Un mismo lote puede fraccionarse en sub-lotes
+  (verde, sarazo, maduro, sobremaduro); cada
+  sub-lote avanza de estado de forma independiente.
+end note
+
+@enduml

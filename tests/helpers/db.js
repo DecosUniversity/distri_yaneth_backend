@@ -11,6 +11,7 @@ const ALL_TABLES = [
   'devoluciones_pedido',
   'entrada_unidades',
   'entradas_mercancia',
+  'etapas_empaque_detalle',
   'inventario_existencias',
   'lotes_materia_prima',
   'movimientos_inventario',
@@ -22,6 +23,7 @@ const ALL_TABLES = [
   'produccion_etapas',
   'produccion_insumos',
   'produccion_mermas',
+  'producto_etapas_requeridas',
   'productos',
   'proveedores',
   'recetas',
@@ -36,7 +38,25 @@ const ALL_TABLES = [
   'vehiculos',
 ];
 
+// Salvaguarda: resetDatabase() hace TRUNCATE de TODAS las tablas. Si algo invoca
+// las pruebas sin pasar por `npm test` (que carga .env.test via tests/setup.js),
+// process.env.DB_NAME cae en el default de src/config/db.js y apunta a la base
+// de datos real. Verificar el nombre de la base activa antes de truncar evita
+// repetir ese incidente.
+const assertTestDatabase = async () => {
+  const [[{ db }]] = await pool.query('SELECT DATABASE() AS db');
+  if (!db || !db.includes('test')) {
+    throw new Error(
+      `Salvaguarda: resetDatabase() se iba a ejecutar contra la base de datos "${db}", ` +
+        'que no parece ser una base de pruebas (se espera un nombre que contenga "test"). ' +
+        'Corre las pruebas con "npm test" (vitest), que carga .env.test, y no con jest ' +
+        'directo ni con la base de datos real activa.'
+    );
+  }
+};
+
 const resetDatabase = async () => {
+  await assertTestDatabase();
   await pool.query('SET FOREIGN_KEY_CHECKS = 0');
 
   for (const table of ALL_TABLES) {

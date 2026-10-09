@@ -32,8 +32,11 @@ const orderQueries = {
 };
 
 const orderDetailQueries = {
-  findByOrder: `SELECT d.id_detalle, d.id_pedido, d.id_producto, p.nombre AS producto_nombre, p.unidad_medida, d.id_existencia, ie.fecha_vencimiento AS existencia_fecha_vencimiento, d.cantidad, d.estado_entrega, d.cantidad_entregada FROM ${ORDER_DETAIL_TABLE} d LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = d.id_producto LEFT JOIN ${INVENTORY_TABLE} ie ON ie.id_existencia = d.id_existencia WHERE d.id_pedido = ? ORDER BY d.id_detalle ASC`,
-  findByOrders: `SELECT d.id_detalle, d.id_pedido, d.id_producto, p.nombre AS producto_nombre, p.unidad_medida, d.id_existencia, ie.fecha_vencimiento AS existencia_fecha_vencimiento, d.cantidad, d.estado_entrega, d.cantidad_entregada FROM ${ORDER_DETAIL_TABLE} d LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = d.id_producto LEFT JOIN ${INVENTORY_TABLE} ie ON ie.id_existencia = d.id_existencia WHERE d.id_pedido IN (?) ORDER BY d.id_pedido ASC, d.id_detalle ASC`,
+  // precio_unitario es el precio congelado al momento de crear el pedido (ver orders.create);
+  // es inmutable, a diferencia de productos.precio_venta_sugerido que puede cambiar despues.
+  // Pedidos creados antes de la migracion que lo agrego tienen precio_unitario = NULL.
+  findByOrder: `SELECT d.id_detalle, d.id_pedido, d.id_producto, p.nombre AS producto_nombre, p.unidad_medida, d.id_existencia, ie.fecha_vencimiento AS existencia_fecha_vencimiento, d.cantidad, d.precio_unitario, d.estado_entrega, d.cantidad_entregada FROM ${ORDER_DETAIL_TABLE} d LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = d.id_producto LEFT JOIN ${INVENTORY_TABLE} ie ON ie.id_existencia = d.id_existencia WHERE d.id_pedido = ? ORDER BY d.id_detalle ASC`,
+  findByOrders: `SELECT d.id_detalle, d.id_pedido, d.id_producto, p.nombre AS producto_nombre, p.unidad_medida, d.id_existencia, ie.fecha_vencimiento AS existencia_fecha_vencimiento, d.cantidad, d.precio_unitario, d.estado_entrega, d.cantidad_entregada FROM ${ORDER_DETAIL_TABLE} d LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = d.id_producto LEFT JOIN ${INVENTORY_TABLE} ie ON ie.id_existencia = d.id_existencia WHERE d.id_pedido IN (?) ORDER BY d.id_pedido ASC, d.id_detalle ASC`,
   findById: `SELECT d.id_detalle, d.id_pedido, d.id_producto, p.nombre AS producto_nombre, p.unidad_medida, d.id_existencia, ie.fecha_vencimiento AS existencia_fecha_vencimiento, d.cantidad, d.estado_entrega, d.cantidad_entregada FROM ${ORDER_DETAIL_TABLE} d LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = d.id_producto LEFT JOIN ${INVENTORY_TABLE} ie ON ie.id_existencia = d.id_existencia WHERE d.id_detalle = ?`,
   findForUpdate: `SELECT id_detalle, id_pedido, id_producto, id_existencia, cantidad, estado_entrega, cantidad_entregada FROM ${ORDER_DETAIL_TABLE} WHERE id_detalle = ? FOR UPDATE`,
   findForReturnCheck: `SELECT d.id_detalle, d.id_producto, d.id_existencia, d.cantidad, d.estado_entrega, d.cantidad_entregada, o.id_pedido, o.estado AS pedido_estado FROM ${ORDER_DETAIL_TABLE} d INNER JOIN ${ORDERS_TABLE} o ON o.id_pedido = d.id_pedido WHERE d.id_detalle = ? FOR UPDATE`,
@@ -105,6 +108,46 @@ const handlers = {
        WHERE ${where}
        GROUP BY o.id_cliente, c.nombre_comercial
        ORDER BY total_pedidos DESC, cantidad_total DESC
+       LIMIT 50`,
+      params
+    );
+
+    return rows;
+  },
+  // Compras = SUM(cantidad * precio_unitario), el precio CONGELADO al crear cada linea, no el
+  // precio actual del producto. Pedidos de antes de que existiera esa columna simplemente no
+  // aportan valor (precio_unitario NULL -> el producto de esa fila se trata como 0).
+  'orders.reportComprasPorCliente': async ({ desde, hasta }) => {
+    const { where, params } = buildOrderReportFilters({ desde, hasta, id_cliente: null });
+
+    const [rows] = await pool.query(
+      `SELECT o.id_cliente, c.nombre_comercial,
+              COUNT(DISTINCT o.id_pedido) AS total_pedidos,
+              COALESCE(SUM(d.cantidad * d.precio_unitario), 0) AS total_compras
+       FROM ${ORDERS_TABLE} o
+       LEFT JOIN ${ORDER_DETAIL_TABLE} d ON d.id_pedido = o.id_pedido
+       LEFT JOIN ${CLIENTS_TABLE} c ON c.id_cliente = o.id_cliente
+       WHERE ${where}
+       GROUP BY o.id_cliente, c.nombre_comercial
+       ORDER BY total_compras DESC
+       LIMIT 50`,
+      params
+    );
+
+    return rows;
+  },
+  'orders.reportComprasPorProducto': async ({ desde, hasta, id_cliente }) => {
+    const { where, params } = buildOrderReportFilters({ desde, hasta, id_cliente });
+
+    const [rows] = await pool.query(
+      `SELECT d.id_producto, p.nombre AS producto_nombre,
+              COALESCE(SUM(d.cantidad * d.precio_unitario), 0) AS total_compras
+       FROM ${ORDER_DETAIL_TABLE} d
+       INNER JOIN ${ORDERS_TABLE} o ON o.id_pedido = d.id_pedido
+       LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = d.id_producto
+       WHERE ${where}
+       GROUP BY d.id_producto, p.nombre
+       ORDER BY total_compras DESC
        LIMIT 50`,
       params
     );
@@ -217,9 +260,17 @@ const handlers = {
           throw new Error('La existencia seleccionada no tiene stock suficiente');
         }
 
+        // Se congela el precio de venta sugerido del producto en este instante: el valor de
+        // este pedido ya no cambiara si despues se edita el precio del producto. No existe
+        // ningun UPDATE sobre esta columna en el resto del codigo (es inmutable por diseño).
+        const [[productoPrecio]] = await connection.query(
+          `SELECT precio_venta_sugerido FROM ${PRODUCTS_TABLE} WHERE id_producto = ?`,
+          [linea.id_producto]
+        );
+
         await connection.query(
-          `INSERT INTO ${ORDER_DETAIL_TABLE} (id_pedido, id_producto, id_existencia, cantidad) VALUES (?, ?, ?, ?)`,
-          [orderId, linea.id_producto, selected.id_existencia, cantidadSolicitada]
+          `INSERT INTO ${ORDER_DETAIL_TABLE} (id_pedido, id_producto, id_existencia, cantidad, precio_unitario) VALUES (?, ?, ?, ?, ?)`,
+          [orderId, linea.id_producto, selected.id_existencia, cantidadSolicitada, productoPrecio?.precio_venta_sugerido ?? null]
         );
 
         await connection.query(

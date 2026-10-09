@@ -1,0 +1,34 @@
+@startuml iteracion1_componentes
+' Iteración 1 - Componentes: arquitectura de persistencia asíncrona integrada
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam componentBackgroundColor #FFFFFF
+skinparam componentBorderColor #4D4D4D
+skinparam ArrowColor #4D4D4D
+skinparam databaseBackgroundColor #FFFFFF
+skinparam databaseBorderColor #4D4D4D
+skinparam queueBackgroundColor #FFFFFF
+skinparam queueBorderColor #4D4D4D
+skinparam noteBackgroundColor #FDFDF0
+skinparam noteBorderColor #4D4D4D
+
+component "Cliente Web\n(React.js)" as CW
+component "API REST\n(Node.js / Express)" as API
+queue "Cola de Trabajos\n(BullMQ / Redis)" as Q
+component "Worker\n(Node.js)" as W
+database "Base de Datos\n(MySQL)" as DB
+
+CW --> API : Solicitudes HTTP / JSON\n(con Token JWT)
+API --> Q : Encola el trabajo de verificación
+Q --> W : Despacha el trabajo
+W --> DB : Consulta y persiste datos
+W --> Q : Publica el resultado del trabajo
+API --> CW : Respuesta (datos + Token JWT)
+
+note bottom of Q
+  El cliente nunca consulta la base de datos
+  de forma directa: toda operación pasa por
+  la cola y la procesa el Worker.
+end note
+
+@enduml

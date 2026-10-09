@@ -1,0 +1,42 @@
+@startuml iteracion2_casos_de_uso
+' Iteración 2 - Módulo de Entrada de Materia Prima y Calidad (REQ002 / CU002)
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam actorStyle hollow
+left to right direction
+skinparam actor {
+  BorderColor #4D4D4D
+  BackgroundColor #F2F2F2
+}
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+  ArrowColor #4D4D4D
+}
+skinparam rectangle {
+  BorderColor #4D4D4D
+  BackgroundColor #FFFFFF
+}
+
+actor "Operador de Planta" as Op
+actor "Administrador" as A
+
+rectangle "**//Módulo de Entrada de Materia Prima y Calidad//**" {
+  usecase "Gestionar Catálogos Maestros\n(Clientes y Proveedores)" as UC_Cat
+  usecase "Registrar Entrada de Lote" as UC_Lote
+  usecase "Registrar Pesaje por Cajas\n(peso neto = peso bruto - tara)" as UC_Pesaje
+  usecase "Registrar Mediciones de Laboratorio\n(Brix / Materia Seca)" as UC_Lab
+  usecase "Registrar Estado de Sub-lote\n(evalúa el umbral de maduración)" as UC_Sub
+  usecase "Autorizar Traslado a Producción" as UC_Auth
+}
+
+A --> UC_Cat
+Op --> UC_Lote
+Op --> UC_Pesaje
+Op --> UC_Lab
+Op --> UC_Sub
+A --> UC_Auth
+UC_Lab --> UC_Sub
+UC_Sub --> UC_Auth
+
+@enduml

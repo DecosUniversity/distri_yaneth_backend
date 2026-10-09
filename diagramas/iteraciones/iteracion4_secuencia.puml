@@ -1,0 +1,44 @@
+@startuml iteracion4_secuencia
+' Iteración 4 - Secuencia: planificación de ruta y ciclo de entrega
+skinparam shadowing false
+skinparam actorStyle hollow
+skinparam sequence {
+  ArrowColor #4D4D4D
+  LifeLineBorderColor #4D4D4D
+  LifeLineBackgroundColor #F7F7F7
+  ParticipantBorderColor #4D4D4D
+  ParticipantBackgroundColor #FFFFFF
+  ActorBorderColor #4D4D4D
+  ActorBackgroundColor #F2F2F2
+}
+skinparam databaseBorderColor #4D4D4D
+skinparam databaseBackgroundColor #FFFFFF
+skinparam queueBorderColor #4D4D4D
+skinparam queueBackgroundColor #FFFFFF
+
+actor "Administrador" as A
+actor "Piloto" as P
+participant "Cliente Web" as CW
+participant "API REST" as API
+queue "Cola de Trabajos\n(BullMQ / Redis)" as Q
+participant "Worker" as W
+database "Base de Datos\n(MySQL)" as DB
+
+A -> CW : Selecciona pedidos pendientes y crea la ruta
+CW -> API : Envía datos de la ruta
+API -> DB : Valida disponibilidad de vehículo y piloto
+DB --> API : Disponible
+API -> Q : Encola la generación del manifiesto
+Q -> W : Procesa la tarea
+W -> DB : Genera manifiesto y pasa los pedidos a "Preparado"
+
+loop Por cada evento del viaje (salida, entrega, llegada)
+  P -> CW : Registra kilometraje / combustible / confirmación de entrega
+  CW -> API : Envía el evento
+  API -> DB : Actualiza estado de la ruta y del pedido
+end
+
+API --> CW : Actualiza el estado en pantalla
+CW --> A : Muestra el estado de la ruta
+
+@enduml

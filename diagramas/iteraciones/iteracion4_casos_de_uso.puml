@@ -1,0 +1,45 @@
+@startuml iteracion4_casos_de_uso
+' Iteración 4 - Módulo de Logística y Distribución (REQ004 / CU004)
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam actorStyle hollow
+left to right direction
+skinparam actor {
+  BorderColor #4D4D4D
+  BackgroundColor #F2F2F2
+}
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+  ArrowColor #4D4D4D
+}
+skinparam rectangle {
+  BorderColor #4D4D4D
+  BackgroundColor #FFFFFF
+}
+
+actor "Administrador" as A
+actor "Piloto" as P
+
+rectangle "**//Módulo de Logística y Distribución//**" {
+  usecase "Planificar y Asignar Ruta\n(valida disponibilidad, genera manifiesto)" as UC_Ruta
+  usecase "Registrar Kilometraje y Combustible" as UC_Km
+  usecase "Confirmar Entrega" as UC_Entrega
+  usecase "Seguir Estados del Pedido" as UC_Seg
+  usecase "Registrar Devolución con Motivo" as UC_Dev
+  usecase "Recepcionar Devolución en Bodega" as UC_Recep
+  usecase "Resolver Devolución\n(reingresa a inventario o pérdida)" as UC_Resol
+}
+
+A --> UC_Ruta
+A --> UC_Seg
+A --> UC_Recep
+A --> UC_Resol
+P --> UC_Km
+P --> UC_Entrega
+P --> UC_Seg
+P --> UC_Dev
+UC_Dev --> UC_Recep
+UC_Recep --> UC_Resol
+
+@enduml

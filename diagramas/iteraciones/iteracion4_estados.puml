@@ -1,0 +1,38 @@
+@startuml iteracion4_estados
+' Iteración 4 - Estados del pedido
+skinparam shadowing false
+skinparam state {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+  ArrowColor #4D4D4D
+  FontColor #000000
+}
+
+[*] --> Pendiente
+
+state "Pendiente" as Pendiente
+state "Preparado" as Preparado
+state "En Ruta" as EnRuta
+state "Entregado" as Entregado
+state "Devuelto" as Devuelto
+state "Reingresado a Inventario" as Reingreso
+state "Pérdida" as Perdida
+
+Pendiente --> Preparado : Ruta asignada y\nmanifiesto generado
+Preparado --> EnRuta : Piloto registra\nkilometraje de salida
+EnRuta --> Entregado : Piloto confirma la entrega
+EnRuta --> Devuelto : Cliente rechaza la mercadería\n(registra motivo)
+Entregado --> Devuelto : Devolución posterior\n(registra motivo)
+Devuelto --> Reingreso : Recepción en bodega +\nresolución: producto reutilizable
+Devuelto --> Perdida : Recepción en bodega +\nresolución: producto no reutilizable
+Entregado --> [*]
+Reingreso --> [*]
+Perdida --> [*]
+
+note bottom of Devuelto
+  La devolución se procesa en dos pasos:
+  1) recepción física en bodega
+  2) resolución (reingreso a inventario o pérdida).
+end note
+
+@enduml

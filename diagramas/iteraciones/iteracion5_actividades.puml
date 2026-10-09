@@ -1,0 +1,32 @@
+@startuml iteracion5_actividades
+' Iteración 5 - Actividades: flujo de análisis gerencial
+skinparam shadowing false
+skinparam ArrowColor #4D4D4D
+skinparam activity {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+  DiamondBackgroundColor #FFFFFF
+  DiamondBorderColor #4D4D4D
+  StartColor #4D4D4D
+  EndColor #4D4D4D
+  BarColor #4D4D4D
+}
+
+start
+:Abrir el dashboard de indicadores;
+:Aplicar filtros (fecha, cliente, tipo de merma);
+:Revisar indicadores de producción, mermas y ventas;
+
+if (¿Requiere un análisis con mayor detalle?) then (no)
+  stop
+else (sí)
+  :Elegir el reporte\n(inventario valorizado / trazabilidad de lote / eficiencia de flota);
+  :Generar el reporte detallado\n(cálculo de costos y consolidación de datos);
+  if (¿Exportar la información?) then (sí)
+    :Descargar en PDF / Excel;
+  else (no)
+  endif
+  stop
+endif
+
+@enduml

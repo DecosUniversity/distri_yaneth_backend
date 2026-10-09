@@ -62,60 +62,79 @@ describe('GET /api/trazabilidad', () => {
   });
 });
 
-describe('POST /api/redes-verdes (cajas)', () => {
-  it('registra varias cajas de una red verde en un solo envio por HTTP', async () => {
+// El empaque de redes se estandarizo dentro de Produccion: ya no existe POST /api/redes-verdes,
+// se usa el mismo POST /api/produccion/procesos + POST .../etapas (con `cajas`) que cualquier
+// otro producto. Ver tests/workers/production_green_pack.test.js para el resto del flujo.
+describe('POST /api/produccion/procesos/:id/etapas (cajas de empaque en red)', () => {
+  const createGreenSublot = async (pesoKg) => {
     const [lotResult] = await pool.query(
       `INSERT INTO lotes_materia_prima (id_producto, id_proveedor, fecha_recepcion, peso_inicial_kg, estado_maduracion, estado_registro)
-       VALUES (?, ?, CURRENT_DATE, 200, 'Verde', 'Activo')`,
-      [baseline.idProductoMateriaPrima, baseline.idProveedor]
+       VALUES (?, ?, CURRENT_DATE, ?, 'Verde', 'Activo')`,
+      [baseline.idProductoMateriaPrima, baseline.idProveedor, pesoKg]
     );
     const [sublotResult] = await pool.query(
       `INSERT INTO sublotes_maduracion (id_lote_mp, codigo_sublote, peso_inicial_kg, peso_kg, estado_maduracion, estado_registro)
-       VALUES (?, 'A', 200, 200, 'Verde', 'Activo')`,
-      [lotResult.insertId]
+       VALUES (?, 'A', ?, ?, 'Verde', 'Activo')`,
+      [lotResult.insertId, pesoKg, pesoKg]
     );
+    return sublotResult.insertId;
+  };
 
-    const response = await request(app)
-      .post('/api/redes-verdes')
+  it('inicia un proceso desde un sub-lote Verde y registra varias cajas en una etapa, por HTTP', async () => {
+    const idSublote = await createGreenSublot(200);
+
+    const processResponse = await request(app)
+      .post('/api/produccion/procesos')
       .set('Authorization', authHeader)
       .send({
-        id_sublote: sublotResult.insertId,
-        id_producto: baseline.idProductoTerminado,
-        fecha_vencimiento: '2027-01-01',
+        id_sublote: idSublote,
+        id_producto_resultado: baseline.idProductoTerminado,
+        cantidad_ingresada_kg: 49.5,
+      });
+
+    expect(processResponse.status).toBe(201);
+
+    const stageResponse = await request(app)
+      .post(`/api/produccion/procesos/${processResponse.body.id_proceso}/etapas`)
+      .set('Authorization', authHeader)
+      .send({
+        id_tipo_etapa: baseline.idTipoEtapa,
+        cantidad_personas: 2,
+        fecha_inicio: new Date().toISOString(),
         cajas: [
           { cantidad_redes: 50, peso_kg: 25 },
           { cantidad_redes: 50, peso_kg: 24.5 },
         ],
       });
 
-    expect(response.status).toBe(201);
-    expect(response.body).toHaveLength(2);
-    expect(response.body[0].cantidad_redes).toBe(50);
+    expect(stageResponse.status).toBe(201);
+    expect(stageResponse.body.cajas).toHaveLength(2);
+    expect(stageResponse.body.cajas[0].cantidad_redes).toBe(50);
   });
 
-  it('devuelve 400 si no se envia ninguna caja', async () => {
-    const [lotResult] = await pool.query(
-      `INSERT INTO lotes_materia_prima (id_producto, id_proveedor, fecha_recepcion, peso_inicial_kg, estado_maduracion, estado_registro)
-       VALUES (?, ?, CURRENT_DATE, 50, 'Verde', 'Activo')`,
-      [baseline.idProductoMateriaPrima, baseline.idProveedor]
-    );
-    const [sublotResult] = await pool.query(
-      `INSERT INTO sublotes_maduracion (id_lote_mp, codigo_sublote, peso_inicial_kg, peso_kg, estado_maduracion, estado_registro)
-       VALUES (?, 'A', 50, 50, 'Verde', 'Activo')`,
-      [lotResult.insertId]
-    );
+  it('devuelve 400 si una caja no trae un peso valido', async () => {
+    const idSublote = await createGreenSublot(50);
 
-    const response = await request(app)
-      .post('/api/redes-verdes')
+    const processResponse = await request(app)
+      .post('/api/produccion/procesos')
       .set('Authorization', authHeader)
       .send({
-        id_sublote: sublotResult.insertId,
-        id_producto: baseline.idProductoTerminado,
-        fecha_vencimiento: '2027-01-01',
-        cajas: [],
+        id_sublote: idSublote,
+        id_producto_resultado: baseline.idProductoTerminado,
+        cantidad_ingresada_kg: 25,
       });
 
-    expect(response.status).toBe(400);
-    expect(response.body.message).toMatch(/al menos una caja/);
+    const stageResponse = await request(app)
+      .post(`/api/produccion/procesos/${processResponse.body.id_proceso}/etapas`)
+      .set('Authorization', authHeader)
+      .send({
+        id_tipo_etapa: baseline.idTipoEtapa,
+        cantidad_personas: 2,
+        fecha_inicio: new Date().toISOString(),
+        cajas: [{ cantidad_redes: 50, peso_kg: 0 }],
+      });
+
+    expect(stageResponse.status).toBe(400);
+    expect(stageResponse.body.message).toMatch(/peso mayor a 0/);
   });
 });

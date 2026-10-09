@@ -135,6 +135,36 @@ const getReporteMejoresClientes = async (req, res, next) => {
   }
 };
 
+const getReporteComprasPorCliente = async (req, res, next) => {
+  try {
+    const { error, filters } = parseReportFilters(req.query);
+
+    if (error) {
+      return res.status(400).json({ message: error });
+    }
+
+    const report = await orderModel.reportComprasPorCliente(filters);
+    return res.status(200).json(report);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const getReporteComprasPorProducto = async (req, res, next) => {
+  try {
+    const { error, filters } = parseReportFilters(req.query);
+
+    if (error) {
+      return res.status(400).json({ message: error });
+    }
+
+    const report = await orderModel.reportComprasPorProducto(filters);
+    return res.status(200).json(report);
+  } catch (error) {
+    return next(error);
+  }
+};
+
 const getReportePedidosDelDia = async (req, res, next) => {
   try {
     const { fecha } = req.query;
@@ -273,4 +303,6 @@ module.exports = {
   getReporteProductosMasVendidos,
   getReporteMejoresClientes,
   getReportePedidosDelDia,
+  getReporteComprasPorCliente,
+  getReporteComprasPorProducto,
 };

@@ -16,6 +16,7 @@ const { handlers: maturationHandlers } = require('./domains/maturation.worker');
 const { handlers: greenNetHandlers } = require('./domains/green_net.worker');
 const { handlers: productionHandlers } = require('./domains/production.worker');
 const { handlers: productionOrderHandlers } = require('./domains/production_order.worker');
+const { handlers: productStageRequirementHandlers } = require('./domains/product_stage_requirement.worker');
 const { handlers: vehicleHandlers } = require('./domains/vehicle.worker');
 const { handlers: vehicleMileageReportHandlers } = require('./domains/vehicle_mileage_report.worker');
 const { handlers: vehicleServiceHandlers } = require('./domains/vehicle_service.worker');
@@ -39,6 +40,7 @@ const handlers = {
   ...greenNetHandlers,
   ...productionHandlers,
   ...productionOrderHandlers,
+  ...productStageRequirementHandlers,
   ...vehicleHandlers,
   ...vehicleMileageReportHandlers,
   ...vehicleServiceHandlers,

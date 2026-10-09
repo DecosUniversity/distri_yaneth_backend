@@ -1,0 +1,44 @@
+@startuml iteracion2_secuencia
+' Iteración 2 - Secuencia: recepción de lote y control de maduración por sub-lotes
+skinparam shadowing false
+skinparam actorStyle hollow
+skinparam sequence {
+  ArrowColor #4D4D4D
+  LifeLineBorderColor #4D4D4D
+  LifeLineBackgroundColor #F7F7F7
+  ParticipantBorderColor #4D4D4D
+  ParticipantBackgroundColor #FFFFFF
+  ActorBorderColor #4D4D4D
+  ActorBackgroundColor #F2F2F2
+}
+skinparam databaseBorderColor #4D4D4D
+skinparam databaseBackgroundColor #FFFFFF
+skinparam queueBorderColor #4D4D4D
+skinparam queueBackgroundColor #FFFFFF
+
+actor "Operador de Planta" as Op
+participant "Cliente Web" as CW
+participant "API REST" as API
+queue "Cola de Trabajos\n(BullMQ / Redis)" as Q
+participant "Worker" as W
+database "Base de Datos\n(MySQL)" as DB
+
+Op -> CW : Registra entrada de lote y pesaje por cajas
+CW -> API : Envía datos del lote
+API -> DB : Guarda lote (estado "En Espera")
+API -> Q : Encola cálculo de peso neto (bruto - tara)
+Q -> W : Procesa la tarea
+W -> DB : Registra peso neto y pasa el lote a maduración ("En Proceso")
+
+loop Muestreo periódico de maduración
+  Op -> CW : Ingresa mediciones de laboratorio (Brix / Materia Seca)
+  CW -> API : Envía mediciones del sub-lote
+  API -> DB : Actualiza métricas y evalúa el umbral técnico
+end
+
+API --> CW : Marca sub-lote "Listo para Proceso" y muestra alerta en el dashboard
+Op -> CW : Autoriza el traslado al módulo de producción
+CW -> API : Confirma la autorización
+API -> DB : Registra peso neto disponible y estado "Procesado"
+
+@enduml

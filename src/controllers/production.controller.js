@@ -7,6 +7,8 @@ const parseId = (value) => Number.parseInt(value, 10);
 const FINISHED_PRODUCT_TYPE = 'Producto Terminado';
 const INSUMO_PRODUCT_TYPE = 'Insumo';
 const SUBLOT_READY_STATE = 'Listo para produccion';
+const SUBLOT_ACTIVE_STATE = 'Activo';
+const GREEN_RIPENESS_STATE = 'Verde';
 
 const formatDateTime = (value) => {
   if (!value) {
@@ -30,10 +32,16 @@ const BUSINESS_RULE_MESSAGES = [
   'La orden de produccion seleccionada no existe',
   'La orden de produccion ya no esta disponible (Completada o Cancelada)',
   'El producto del proceso no coincide con el producto de la orden de produccion',
+  'Las etapas no se completaron en el orden requerido para este producto',
+  'La etapa seleccionada no forma parte del plan de proceso definido para este producto',
 ];
 
 const handleProductionError = (error, res, next) => {
-  if (BUSINESS_RULE_MESSAGES.includes(error.message) || error.message.startsWith('El peso no cuadra')) {
+  if (
+    BUSINESS_RULE_MESSAGES.includes(error.message) ||
+    error.message.startsWith('El peso no cuadra') ||
+    error.message.startsWith('Faltan etapas requeridas')
+  ) {
     return res.status(400).json({ message: error.message });
   }
 
@@ -94,6 +102,46 @@ const validateStagePayload = (payload) => {
   }
 
   return null;
+};
+
+// El desglose de cajas es opcional en cualquier etapa (no solo "Empaque en red"): si viene,
+// cada caja debe traer una cantidad de redes y un peso validos. `undefined` significa "no
+// tocar el desglose existente" (distinto de un arreglo vacio, que si lo borra).
+const validateCajasPayload = (cajas) => {
+  if (cajas === undefined) {
+    return null;
+  }
+
+  if (!Array.isArray(cajas)) {
+    return 'cajas debe ser un arreglo';
+  }
+
+  for (let index = 0; index < cajas.length; index += 1) {
+    const caja = cajas[index] || {};
+    const cantidadRedes = Number.parseInt(caja.cantidad_redes, 10);
+    const pesoKg = Number(caja.peso_kg);
+
+    if (!Number.isFinite(cantidadRedes) || cantidadRedes <= 0) {
+      return `La caja ${index + 1} debe tener una cantidad de redes mayor a 0`;
+    }
+
+    if (!Number.isFinite(pesoKg) || pesoKg <= 0) {
+      return `La caja ${index + 1} debe tener un peso mayor a 0`;
+    }
+  }
+
+  return null;
+};
+
+const normalizeCajasPayload = (cajas) => {
+  if (cajas === undefined) {
+    return undefined;
+  }
+
+  return cajas.map((caja) => ({
+    cantidad_redes: Number.parseInt(caja.cantidad_redes, 10),
+    peso_kg: Number(caja.peso_kg),
+  }));
 };
 
 const validateStageUpdatePayload = (payload) => {
@@ -216,6 +264,23 @@ const getReporteProduccionPorProducto = async (_req, res, next) => {
   }
 };
 
+const PRODUCTIVITY_GROUPINGS = ['mensual', 'semanal', 'producto'];
+
+const getReporteProductividad = async (req, res, next) => {
+  try {
+    const agrupacion = String(req.query.agrupacion || 'mensual').toLowerCase();
+
+    if (!PRODUCTIVITY_GROUPINGS.includes(agrupacion)) {
+      return res.status(400).json({ message: `agrupacion debe ser una de: ${PRODUCTIVITY_GROUPINGS.join(', ')}` });
+    }
+
+    const report = await productionModel.reportProductividad(agrupacion);
+    return res.status(200).json(report);
+  } catch (error) {
+    return next(error);
+  }
+};
+
 const getProcesoById = async (req, res, next) => {
   try {
     const id = parseId(req.params.id);
@@ -264,9 +329,16 @@ const createProceso = async (req, res, next) => {
       return res.status(404).json({ message: 'Sub-lote de materia prima no encontrado' });
     }
 
-    if (String(sublote.estado_registro || '').trim() !== SUBLOT_READY_STATE) {
+    const sublotEstadoRegistro = String(sublote.estado_registro || '').trim();
+    const sublotEstadoMaduracion = String(sublote.estado_maduracion || '').trim();
+    // Un sub-lote Verde aun "Activo" tambien puede iniciar un proceso (ej. empaque en red de
+    // fruta verde que se vende tal cual, en vez de esperar a que termine de madurar).
+    const isReadySublot = sublotEstadoRegistro === SUBLOT_READY_STATE;
+    const isGreenActiveSublot = sublotEstadoRegistro === SUBLOT_ACTIVE_STATE && sublotEstadoMaduracion === GREEN_RIPENESS_STATE;
+
+    if (!isReadySublot && !isGreenActiveSublot) {
       return res.status(400).json({
-        message: 'El sub-lote debe estar Listo para produccion para iniciar un proceso',
+        message: 'El sub-lote debe estar Listo para produccion (o Verde y Activo) para iniciar un proceso',
       });
     }
 
@@ -300,6 +372,12 @@ const addEtapa = async (req, res, next) => {
       return res.status(400).json({ message: validationError });
     }
 
+    const cajasError = validateCajasPayload(req.body.cajas);
+
+    if (cajasError) {
+      return res.status(400).json({ message: cajasError });
+    }
+
     const stage = await productionModel.addStage(id, {
       id_tipo_etapa: parseId(req.body.id_tipo_etapa),
       cantidad_personas: Number.parseInt(req.body.cantidad_personas, 10),
@@ -307,6 +385,7 @@ const addEtapa = async (req, res, next) => {
       fecha_inicio: formatDateTime(req.body.fecha_inicio),
       cantidad_entrada_kg: emptyToNull(req.body.cantidad_entrada_kg) === null ? null : Number(req.body.cantidad_entrada_kg),
       observaciones: req.body.observaciones,
+      cajas: normalizeCajasPayload(req.body.cajas),
       id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
@@ -335,6 +414,12 @@ const updateEtapa = async (req, res, next) => {
       return res.status(400).json({ message: validationError });
     }
 
+    const cajasError = validateCajasPayload(req.body.cajas);
+
+    if (cajasError) {
+      return res.status(400).json({ message: cajasError });
+    }
+
     const stage = await productionModel.updateStage(id, idEtapa, {
       id_tipo_etapa: parseId(req.body.id_tipo_etapa),
       cantidad_personas: Number.parseInt(req.body.cantidad_personas, 10),
@@ -343,6 +428,7 @@ const updateEtapa = async (req, res, next) => {
       fecha_fin: formatDateTime(req.body.fecha_fin),
       cantidad_entrada_kg: emptyToNull(req.body.cantidad_entrada_kg) === null ? null : Number(req.body.cantidad_entrada_kg),
       observaciones: req.body.observaciones,
+      cajas: normalizeCajasPayload(req.body.cajas),
       id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
@@ -555,4 +641,5 @@ module.exports = {
   revertProceso,
   getReporteMermasPorCategoria,
   getReporteProduccionPorProducto,
+  getReporteProductividad,
 };

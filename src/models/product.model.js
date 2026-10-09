@@ -30,6 +30,30 @@ const create = async ({
   });
 };
 
+const createWithStageRequirements = async ({
+  nombre,
+  descripcion,
+  unidad_medida,
+  tipo_producto,
+  stock_minimo,
+  precio_venta_sugerido,
+  estado_registro,
+  etapas,
+  id_usuario_modificacion,
+}) => {
+  return enqueueDbJob('products.createWithStageRequirements', {
+    nombre,
+    descripcion,
+    unidad_medida,
+    tipo_producto,
+    stock_minimo,
+    precio_venta_sugerido,
+    estado_registro,
+    etapas,
+    id_usuario_modificacion,
+  });
+};
+
 const update = async (
   id,
   {
@@ -64,6 +88,7 @@ module.exports = {
   findAll,
   findById,
   create,
+  createWithStageRequirements,
   update,
   remove,
 };

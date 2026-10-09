@@ -1,0 +1,43 @@
+@startuml iteracion1_secuencia
+' Iteración 1 - Secuencia: Autenticación asíncrona con verificación de rol
+skinparam shadowing false
+skinparam actorStyle hollow
+skinparam sequence {
+  ArrowColor #4D4D4D
+  LifeLineBorderColor #4D4D4D
+  LifeLineBackgroundColor #F7F7F7
+  ParticipantBorderColor #4D4D4D
+  ParticipantBackgroundColor #FFFFFF
+  ActorBorderColor #4D4D4D
+  ActorBackgroundColor #F2F2F2
+}
+skinparam databaseBorderColor #4D4D4D
+skinparam databaseBackgroundColor #FFFFFF
+skinparam queueBorderColor #4D4D4D
+skinparam queueBackgroundColor #FFFFFF
+
+actor "Usuario" as U
+participant "Cliente Web\n(React.js)" as CW
+participant "API REST\n(Node.js / Express)" as API
+queue "Cola de Trabajos\n(BullMQ / Redis)" as Q
+participant "Worker\n(Node.js)" as W
+database "Base de Datos\n(MySQL)" as DB
+
+U -> CW : Ingresa credenciales
+CW -> API : POST /auth/login
+API -> Q : Encola la verificación de credenciales
+Q -> W : Despacha el trabajo pendiente
+W -> DB : Consulta usuario y rol asignado
+DB --> W : Registro del usuario
+W -> W : Valida contraseña (bcrypt)\ny genera Token JWT
+
+alt Credenciales válidas
+  W --> API : Resuelve el trabajo (Éxito + rol)
+  API --> CW : 200 OK (Token JWT + rol)
+  CW --> U : Habilita el menú según su rol
+else Credenciales inválidas
+  W --> API : Resuelve el trabajo (Error)
+  API --> CW : 401 No autorizado
+end
+
+@enduml

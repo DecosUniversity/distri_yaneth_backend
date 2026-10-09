@@ -36,6 +36,14 @@ const reportPedidosDelDia = async ({ fecha } = {}) => {
   return enqueueDbJob('orders.reportPedidosDelDia', { fecha });
 };
 
+const reportComprasPorCliente = async ({ desde, hasta }) => {
+  return enqueueDbJob('orders.reportComprasPorCliente', { desde, hasta });
+};
+
+const reportComprasPorProducto = async ({ desde, hasta, id_cliente }) => {
+  return enqueueDbJob('orders.reportComprasPorProducto', { desde, hasta, id_cliente });
+};
+
 module.exports = {
   findAll,
   findById,
@@ -46,4 +54,6 @@ module.exports = {
   reportProductosMasVendidos,
   reportMejoresClientes,
   reportPedidosDelDia,
+  reportComprasPorCliente,
+  reportComprasPorProducto,
 };

@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
 
 const userRoutes = require('./routes/user.routes');
 const providerRoutes = require('./routes/provider.routes');
@@ -31,6 +33,9 @@ app.use(express.json());
 app.get('/health', (_req, res) => {
   res.status(200).json({ ok: true, message: 'API funcionando' });
 });
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.get('/api-docs.json', (_req, res) => res.status(200).json(swaggerSpec));
 
 app.use('/api/users', userRoutes);
 app.use(

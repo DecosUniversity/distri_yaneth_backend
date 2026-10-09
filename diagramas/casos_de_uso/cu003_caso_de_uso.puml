@@ -1,0 +1,43 @@
+@startuml cu003_caso_de_uso
+' CU003 - Control de Producción y Rendimiento (REQ003)
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #EAF2FB
+  BorderColor #2E75B6
+  ArrowColor #2E75B6
+}
+top to bottom direction
+
+actor "Operador de Planta" as Operador
+actor "Administrador" as Admin
+
+rectangle "Control de Producción y Rendimiento" {
+  usecase "Iniciar Proceso de Producción" as UC_Iniciar
+  usecase "Registrar Etapa de Producción" as UC_Etapa
+  usecase "Declarar Merma por Etapa" as UC_Merma
+  usecase "Registrar Consumo de Insumos" as UC_Insumos
+  usecase "Calcular Rendimiento y Balance de Masa" as UC_Rendimiento
+  usecase "Registrar Ingreso a Cuarto Frío" as UC_Frio
+  usecase "Gestionar Catálogos de Etapas y Mermas" as UC_Cat
+  usecase "Generar Plátano Verde en Red" as UC_Red
+}
+
+Operador --> UC_Iniciar
+Operador --> UC_Red
+Admin --> UC_Cat
+
+UC_Iniciar ..> UC_Etapa : <<include>>
+UC_Iniciar ..> UC_Insumos : <<include>>
+UC_Iniciar ..> UC_Rendimiento : <<include>>
+UC_Iniciar ..> UC_Frio : <<include>>
+UC_Etapa ..> UC_Merma : <<include>>
+UC_Cat ..> UC_Etapa : <<extend>>
+UC_Red ..> UC_Iniciar : <<extend>>
+
+note right of UC_Cat
+  Las etapas base (Pelado, Corte, Fritura, Empaque)
+  y los tipos de merma son catálogos extensibles.
+end note
+
+@enduml

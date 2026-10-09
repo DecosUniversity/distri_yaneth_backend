@@ -1,0 +1,340 @@
+@startuml diagrama_er
+' Diagrama Entidad-Relación (actualizado desde sql/schema.sql, 2026-09-08)
+' Nota: se omiten los campos de auditoría repetidos en casi todas las tablas
+' (estado_registro, fecha_creacion, fecha_modificacion, id_usuario_modificacion)
+' y las relaciones de auditoría hacia "usuarios" (quién creó/modificó el registro),
+' para mantener el diagrama legible. Se conservan solo las relaciones funcionales.
+skinparam shadowing false
+skinparam linetype ortho
+skinparam entity {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+  FontStyle bold
+}
+skinparam ArrowColor #4D4D4D
+skinparam ArrowFontColor #4D4D4D
+hide circle
+skinparam EntityStereotypeFontColor #4D4D4D
+
+package "Seguridad y Catálogos Maestros" {
+  entity "usuarios" as usuarios {
+    * id_usuario
+    --
+    nombre_completo
+    username
+    rol
+  }
+  entity "clientes" as clientes {
+    * id_cliente
+    --
+    nombre_comercial
+    departamento
+    municipio
+  }
+  entity "proveedores" as proveedores {
+    * id_proveedor
+    --
+    nombre_empresa
+    nit
+  }
+  entity "productos" as productos {
+    * id_producto
+    --
+    nombre
+    tipo_producto
+    unidad_medida
+  }
+  entity "recetas" as recetas {
+    * id_receta
+    --
+    + id_producto_final
+    + id_insumo
+    cantidad_estandar
+  }
+  entity "auditoria_cambios" as auditoria_cambios {
+    * id_auditoria
+    --
+    + id_usuario
+    tabla_afectada
+    accion
+  }
+}
+
+package "Recepción y Maduración" {
+  entity "entradas_mercancia" as entradas_mercancia {
+    * id_entrada
+    --
+    + id_proveedor
+    codigo_lote
+    fecha_recepcion
+    costo_total
+  }
+  entity "entrada_unidades" as entrada_unidades {
+    * id
+    --
+    + id_entrada
+    unidad_codigo
+    peso
+  }
+  entity "lotes_materia_prima" as lotes_materia_prima {
+    * id_lote_mp
+    --
+    + id_producto
+    + id_proveedor
+    + id_entrada_origen
+    fecha_recepcion
+    peso_inicial_kg
+  }
+  entity "sublotes_maduracion" as sublotes_maduracion {
+    * id_sublote
+    --
+    + id_lote_mp
+    codigo_sublote
+    peso_kg
+    estado_maduracion
+    estado_registro
+  }
+  entity "control_maduracion" as control_maduracion {
+    * id_control
+    --
+    + id_sublote
+    grados_brix
+    porcentaje_materia_seca
+  }
+}
+
+package "Producción" {
+  entity "ordenes_produccion" as ordenes_produccion {
+    * id_orden
+    --
+    + id_producto
+    cantidad_solicitada_kg
+    estado
+  }
+  entity "procesos_produccion" as procesos_produccion {
+    * id_proceso
+    --
+    + id_sublote
+    + id_producto_resultado
+    + id_orden
+    cantidad_ingresada_kg
+    rendimiento_porcentaje
+    estado_proceso
+  }
+  entity "cat_tipos_etapa" as cat_tipos_etapa {
+    * id_tipo_etapa
+    --
+    nombre_etapa
+  }
+  entity "produccion_etapas" as produccion_etapas {
+    * id_etapa
+    --
+    + id_proceso
+    + id_tipo_etapa
+    cantidad_entrada_kg
+    cantidad_salida_kg
+  }
+  entity "producto_etapas_requeridas" as producto_etapas_requeridas {
+    * id_requisito
+    --
+    + id_producto
+    + id_tipo_etapa
+    orden
+  }
+  entity "cat_tipos_merma" as cat_tipos_merma {
+    * id_tipo_merma
+    --
+    nombre_merma
+  }
+  entity "produccion_mermas" as produccion_mermas {
+    * id_merma
+    --
+    + id_proceso
+    + id_etapa
+    + id_tipo_merma
+    cantidad_kg
+  }
+  entity "produccion_insumos" as produccion_insumos {
+    * id_consumo
+    --
+    + id_proceso
+    + id_etapa
+    + id_producto
+    cantidad
+  }
+  entity "produccion_cuartos_frio" as produccion_cuartos_frio {
+    * id_ingreso_cuarto
+    --
+    + id_proceso
+    ubicacion_cuarto
+    cantidad_kg
+  }
+  entity "etapas_empaque_detalle" as etapas_empaque_detalle {
+    * id_detalle
+    --
+    + id_etapa
+    cantidad_redes
+    peso_kg
+  }
+  entity "redes_verde_detalle" as redes_verde_detalle {
+    * id_red
+    --
+    + id_sublote
+    + id_existencia
+    peso_kg
+    cantidad_redes
+  }
+}
+
+package "Inventario y Ventas" {
+  entity "inventario_existencias" as inventario_existencias {
+    * id_existencia
+    --
+    + id_producto
+    + id_proveedor
+    + id_proceso_origen
+    + id_entrada_origen
+    cantidad_disponible
+    fecha_vencimiento
+  }
+  entity "movimientos_inventario" as movimientos_inventario {
+    * id_movimiento
+    --
+    + id_existencia
+    tipo_movimiento
+    cantidad
+  }
+  entity "pedidos" as pedidos {
+    * id_pedido
+    --
+    + id_cliente
+    estado
+    fecha_entrega_programada
+  }
+  entity "pedido_detalle" as pedido_detalle {
+    * id_detalle
+    --
+    + id_pedido
+    + id_producto
+    + id_existencia
+    cantidad
+    estado_entrega
+  }
+  entity "devoluciones_pedido" as devoluciones_pedido {
+    * id_devolucion
+    --
+    + id_detalle
+    cantidad_devuelta
+    resolucion
+  }
+}
+
+package "Logística y Flota" {
+  entity "vehiculos" as vehiculos {
+    * id_vehiculo
+    --
+    placa
+    estado
+    kilometraje_actual
+  }
+  entity "tipos_servicio" as tipos_servicio {
+    * id_tipo_servicio
+    --
+    nombre_servicio
+    km_frecuencia
+  }
+  entity "servicios_vehiculo" as servicios_vehiculo {
+    * id_servicio
+    --
+    + id_vehiculo
+    + id_tipo_servicio
+    fecha_servicio
+    km_en_servicio
+  }
+  entity "reporte_kilometraje_vehiculo" as reporte_kilometraje_vehiculo {
+    * id_reporte_kilometraje
+    --
+    + id_vehiculo
+    kilometraje_registrado
+  }
+  entity "rutas_entrega" as rutas_entrega {
+    * id_ruta
+    --
+    + id_vehiculo
+    + id_piloto
+    estado
+    km_salida
+    km_llegada
+  }
+  entity "ruta_pedidos" as ruta_pedidos {
+    * id_ruta
+    * id_pedido
+    --
+    orden_entrega
+  }
+}
+
+' ---- relaciones funcionales ----
+usuarios |o--o{ auditoria_cambios
+usuarios ||--o{ rutas_entrega : piloto
+
+productos ||--o{ ordenes_produccion
+productos ||--o{ pedido_detalle
+productos ||--o{ produccion_insumos
+productos |o--o{ inventario_existencias
+productos |o--o{ lotes_materia_prima
+productos |o--o{ procesos_produccion : resultado
+productos |o--o{ recetas : producto_final
+productos |o--o{ recetas : insumo
+productos ||--o{ producto_etapas_requeridas
+
+proveedores |o--o{ entradas_mercancia
+proveedores |o--o{ lotes_materia_prima
+proveedores |o--o{ inventario_existencias
+
+clientes ||--o{ pedidos
+
+entradas_mercancia ||--o{ entrada_unidades
+entradas_mercancia |o--o{ lotes_materia_prima
+entradas_mercancia |o--o{ inventario_existencias
+
+lotes_materia_prima ||--o{ sublotes_maduracion
+sublotes_maduracion ||--o{ control_maduracion
+sublotes_maduracion |o--o{ procesos_produccion
+sublotes_maduracion ||--o{ redes_verde_detalle
+
+ordenes_produccion |o--o{ procesos_produccion
+procesos_produccion ||--o{ produccion_etapas
+procesos_produccion ||--o{ produccion_insumos
+procesos_produccion ||--o{ produccion_mermas
+procesos_produccion ||--o{ produccion_cuartos_frio
+procesos_produccion |o--o{ inventario_existencias : origen
+
+cat_tipos_etapa ||--o{ produccion_etapas
+cat_tipos_etapa ||--o{ producto_etapas_requeridas
+cat_tipos_merma ||--o{ produccion_mermas
+
+produccion_etapas |o--o{ produccion_insumos
+produccion_etapas |o--o{ produccion_mermas
+produccion_etapas ||--o{ etapas_empaque_detalle
+
+inventario_existencias |o--o{ pedido_detalle
+inventario_existencias |o--o{ movimientos_inventario
+inventario_existencias ||--o{ redes_verde_detalle
+
+pedidos ||--o{ pedido_detalle
+pedido_detalle ||--o{ devoluciones_pedido
+pedidos ||--o{ ruta_pedidos
+
+vehiculos ||--o{ rutas_entrega
+vehiculos ||--o{ servicios_vehiculo
+vehiculos ||--o{ reporte_kilometraje_vehiculo
+tipos_servicio ||--o{ servicios_vehiculo
+rutas_entrega ||--o{ ruta_pedidos
+
+@enduml

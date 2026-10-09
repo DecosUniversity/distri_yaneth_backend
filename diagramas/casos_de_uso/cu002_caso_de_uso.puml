@@ -1,0 +1,38 @@
+@startuml cu002_caso_de_uso
+' CU002 - Recepción y Control de Maduración (REQ002)
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #EAF2FB
+  BorderColor #2E75B6
+  ArrowColor #2E75B6
+}
+top to bottom direction
+
+actor "Administrador" as Admin
+actor "Operador de Planta" as Operador
+
+rectangle "Recepción y Control de Maduración" {
+  usecase "Registrar Entrada de Lote" as UC_Entrada
+  usecase "Fraccionar Lote en Sub-lotes" as UC_Fraccionar
+  usecase "Mediciones de Laboratorio" as UC_Lab
+  usecase "Registrar Estado de Sub-lote" as UC_EstadoSub
+  usecase "Registrar Pérdida de Maduración" as UC_Perdida
+}
+
+Operador --> UC_Entrada
+Operador --> UC_Lab
+Admin --> UC_Fraccionar
+Admin --> UC_EstadoSub
+Admin --> UC_Perdida
+
+UC_Fraccionar ..> UC_Entrada : <<extend>>
+UC_Lab ..> UC_EstadoSub : <<include>>
+UC_EstadoSub ..> UC_Perdida : <<include>>
+
+note bottom of UC_Fraccionar
+  Los sub-lotes (verde, sazón, maduro) avanzan
+  a producción de forma independiente.
+end note
+
+@enduml

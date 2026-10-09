@@ -2,6 +2,7 @@ const { pool } = require('../../config/db');
 const {
   USERS_TABLE,
   PRODUCTS_TABLE,
+  PRODUCT_STAGE_REQUIREMENTS_TABLE,
   ACTIVE_STATE,
   INACTIVE_STATE,
 } = require('../shared/constants');
@@ -58,6 +59,68 @@ const handlers = {
     });
 
     return created;
+  },
+  // Crea el producto y su plan de etapas (receta) en una sola transaccion: un Producto
+  // Terminado nunca queda registrado sin al menos una etapa requerida.
+  'products.createWithStageRequirements': async ({
+    nombre,
+    descripcion,
+    unidad_medida,
+    tipo_producto,
+    stock_minimo,
+    precio_venta_sugerido,
+    estado_registro,
+    etapas,
+    id_usuario_modificacion,
+  }) => {
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const [result] = await connection.query(
+        `INSERT INTO ${PRODUCTS_TABLE} (nombre, descripcion, unidad_medida, tipo_producto, stock_minimo, precio_venta_sugerido, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          nombre,
+          descripcion ?? null,
+          unidad_medida ?? null,
+          tipo_producto,
+          stock_minimo ?? 10,
+          precio_venta_sugerido ?? 0,
+          estado_registro || ACTIVE_STATE,
+          id_usuario_modificacion ?? null,
+        ]
+      );
+
+      const idProducto = result.insertId;
+
+      for (let index = 0; index < etapas.length; index += 1) {
+        await connection.query(
+          `INSERT INTO ${PRODUCT_STAGE_REQUIREMENTS_TABLE} (id_producto, id_tipo_etapa, orden, id_usuario_modificacion) VALUES (?, ?, ?, ?)`,
+          [idProducto, etapas[index], index + 1, id_usuario_modificacion ?? null]
+        );
+      }
+
+      const [rows] = await connection.query(productQueries.findById, [idProducto]);
+      const created = rows[0] || null;
+
+      await recordAudit(connection, {
+        table: PRODUCTS_TABLE,
+        recordId: idProducto,
+        action: AUDIT_ACTION_CREATE,
+        before: null,
+        after: created,
+        userId: id_usuario_modificacion,
+      });
+
+      await connection.commit();
+      return created;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   },
   'products.update': async ({
     id,

@@ -14,6 +14,8 @@ const {
   PRODUCTION_MERMA_TABLE,
   PRODUCTION_INSUMO_TABLE,
   PRODUCTION_COLD_ROOM_TABLE,
+  PRODUCT_STAGE_REQUIREMENTS_TABLE,
+  PACKING_DETAIL_TABLE,
   PRODUCTION_ORDERS_TABLE,
   ACTIVE_STATE,
   INACTIVE_STATE,
@@ -22,8 +24,10 @@ const {
   PRODUCTION_ORDER_PENDIENTE_STATE,
   PRODUCTION_ORDER_EN_PROCESO_STATE,
   PRODUCTION_ORDER_COMPLETADA_STATE,
+  SUBLOT_ACTIVE_STATE,
   SUBLOT_READY_STATE,
   SUBLOT_SENT_STATE,
+  GREEN_RIPENESS_STATE,
   BALANCE_TOLERANCE_KG,
 } = require('../shared/constants');
 const { normalizeNullableText } = require('../shared/helpers');
@@ -43,6 +47,25 @@ const productionReportQueries = {
   produccionPorProducto: `SELECT pr.id_producto, pr.nombre AS producto_nombre, SUM(p.cantidad_producida_kg) AS total_kg FROM ${PRODUCTION_TABLE} p INNER JOIN ${PRODUCTS_TABLE} pr ON pr.id_producto = p.id_producto_resultado WHERE p.estado_registro = '${ACTIVE_STATE}' AND p.estado_proceso = '${PRODUCTION_FINISHED_STATE}' GROUP BY pr.id_producto, pr.nombre ORDER BY total_kg DESC`,
 };
 
+// Periodo de agrupacion para el reporte de productividad. "producto" no agrupa por fecha,
+// solo consolida por producto en todo el historico.
+const PRODUCTIVITY_PERIOD_SQL = {
+  mensual: "DATE_FORMAT(p.fecha_fin, '%Y-%m')",
+  semanal: "CONCAT(YEARWEEK(p.fecha_fin, 3) DIV 100, '-S', LPAD(YEARWEEK(p.fecha_fin, 3) MOD 100, 2, '0'))",
+  producto: 'NULL',
+};
+
+// Productividad = kg producidos entre las horas-persona invertidas en las etapas de ese
+// proceso (cantidad_personas * duracion de la etapa). Solo se cuentan etapas ya cerradas
+// (fecha_fin registrada) y procesos ya finalizados, para no mezclar trabajo en curso.
+const productivityReportQuery = (agrupacion) => {
+  const periodoExpr = PRODUCTIVITY_PERIOD_SQL[agrupacion] || PRODUCTIVITY_PERIOD_SQL.mensual;
+  const groupByPeriodo = agrupacion === 'producto' ? '' : `${periodoExpr}, `;
+  const orderBy = agrupacion === 'producto' ? 'total_kg_producido DESC' : 'periodo DESC, total_kg_producido DESC';
+
+  return `SELECT ${periodoExpr} AS periodo, pr.id_producto, pr.nombre AS producto_nombre, COUNT(DISTINCT p.id_proceso) AS total_procesos, SUM(p.cantidad_producida_kg) AS total_kg_producido, COALESCE(SUM(hp.horas_persona), 0) AS total_horas_persona, COALESCE(SUM(hp.total_personas_etapa), 0) AS total_personas_etapa, ROUND(SUM(p.cantidad_producida_kg) / NULLIF(SUM(hp.horas_persona), 0), 3) AS kg_por_hora_persona FROM ${PRODUCTION_TABLE} p INNER JOIN ${PRODUCTS_TABLE} pr ON pr.id_producto = p.id_producto_resultado LEFT JOIN (SELECT id_proceso, SUM(cantidad_personas * TIMESTAMPDIFF(MINUTE, fecha_inicio, fecha_fin) / 60) AS horas_persona, SUM(cantidad_personas) AS total_personas_etapa FROM ${PRODUCTION_STAGE_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' AND fecha_fin IS NOT NULL AND cantidad_personas IS NOT NULL GROUP BY id_proceso) hp ON hp.id_proceso = p.id_proceso WHERE p.estado_registro = '${ACTIVE_STATE}' AND p.estado_proceso = '${PRODUCTION_FINISHED_STATE}' AND p.fecha_fin IS NOT NULL GROUP BY ${groupByPeriodo}pr.id_producto, pr.nombre ORDER BY ${orderBy}`;
+};
+
 const productionMermaQueries = {
   findByProcess: `SELECT m.id_merma, m.id_proceso, m.id_etapa, m.id_tipo_merma, ctm.nombre_merma, m.cantidad_kg, m.observaciones, m.fecha_registro, m.estado_registro, m.fecha_creacion, m.fecha_modificacion, m.id_usuario_modificacion, um.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTION_MERMA_TABLE} m LEFT JOIN ${CAT_MERMA_TABLE} ctm ON ctm.id_tipo_merma = m.id_tipo_merma LEFT JOIN ${USERS_TABLE} um ON um.id_usuario = m.id_usuario_modificacion WHERE m.id_proceso = ? AND m.estado_registro = '${ACTIVE_STATE}' ORDER BY m.fecha_registro DESC, m.id_merma DESC`,
   findById: `SELECT m.id_merma, m.id_proceso, m.id_etapa, m.id_tipo_merma, ctm.nombre_merma, m.cantidad_kg, m.observaciones, m.fecha_registro, m.estado_registro, m.fecha_creacion, m.fecha_modificacion, m.id_usuario_modificacion, um.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTION_MERMA_TABLE} m LEFT JOIN ${CAT_MERMA_TABLE} ctm ON ctm.id_tipo_merma = m.id_tipo_merma LEFT JOIN ${USERS_TABLE} um ON um.id_usuario = m.id_usuario_modificacion WHERE m.id_merma = ?`,
@@ -51,6 +74,14 @@ const productionMermaQueries = {
 const productionInsumoQueries = {
   findByProcess: `SELECT i.id_consumo, i.id_proceso, i.id_etapa, i.id_producto, prd.nombre AS producto_nombre, i.cantidad, i.unidad_medida, i.observaciones, i.fecha_registro, i.estado_registro, i.fecha_creacion, i.fecha_modificacion, i.id_usuario_modificacion, um.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTION_INSUMO_TABLE} i LEFT JOIN ${PRODUCTS_TABLE} prd ON prd.id_producto = i.id_producto LEFT JOIN ${USERS_TABLE} um ON um.id_usuario = i.id_usuario_modificacion WHERE i.id_proceso = ? AND i.estado_registro = '${ACTIVE_STATE}' ORDER BY i.fecha_registro DESC, i.id_consumo DESC`,
   findById: `SELECT i.id_consumo, i.id_proceso, i.id_etapa, i.id_producto, prd.nombre AS producto_nombre, i.cantidad, i.unidad_medida, i.observaciones, i.fecha_registro, i.estado_registro, i.fecha_creacion, i.fecha_modificacion, i.id_usuario_modificacion, um.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTION_INSUMO_TABLE} i LEFT JOIN ${PRODUCTS_TABLE} prd ON prd.id_producto = i.id_producto LEFT JOIN ${USERS_TABLE} um ON um.id_usuario = i.id_usuario_modificacion WHERE i.id_consumo = ?`,
+};
+
+const packingDetailQueries = {
+  // Se busca por proceso (join contra las etapas de ese proceso) y no por etapa suelta, para
+  // poder traer de un solo viaje el desglose de cajas de todas las etapas de empaque de un
+  // proceso, tal como se hace con etapas/mermas/insumos en loadProductionProcessDetail.
+  findByProcess: `SELECT d.id_detalle, d.id_etapa, d.cantidad_redes, d.peso_kg FROM ${PACKING_DETAIL_TABLE} d INNER JOIN ${PRODUCTION_STAGE_TABLE} e ON e.id_etapa = d.id_etapa WHERE e.id_proceso = ? AND d.estado_registro = '${ACTIVE_STATE}' ORDER BY d.id_etapa ASC, d.id_detalle ASC`,
+  findByEtapa: `SELECT id_detalle, id_etapa, cantidad_redes, peso_kg FROM ${PACKING_DETAIL_TABLE} WHERE id_etapa = ? AND estado_registro = '${ACTIVE_STATE}' ORDER BY id_detalle ASC`,
 };
 
 const productionColdRoomQueries = {
@@ -76,20 +107,52 @@ const loadProductionProcessDetail = async (connection, id) => {
   const [mermas] = await connection.query(productionMermaQueries.findByProcess, [id]);
   const [insumos] = await connection.query(productionInsumoQueries.findByProcess, [id]);
   const [cuartosFrio] = await connection.query(productionColdRoomQueries.findByProcess, [id]);
+  const [cajasRows] = await connection.query(packingDetailQueries.findByProcess, [id]);
 
   const process = processRows[0];
   const totalMermaKg = mermas.reduce((sum, item) => sum + (Number(item.cantidad_kg) || 0), 0);
   const totalInsumos = insumos.reduce((sum, item) => sum + (Number(item.cantidad) || 0), 0);
 
+  const cajasByEtapa = new Map();
+  for (const caja of cajasRows) {
+    const list = cajasByEtapa.get(caja.id_etapa) || [];
+    list.push({ id_detalle: caja.id_detalle, cantidad_redes: caja.cantidad_redes, peso_kg: caja.peso_kg });
+    cajasByEtapa.set(caja.id_etapa, list);
+  }
+  const etapasConCajas = etapas.map((etapa) => ({ ...etapa, cajas: cajasByEtapa.get(etapa.id_etapa) || [] }));
+
   return {
     ...process,
     total_merma_kg: totalMermaKg,
     total_insumos: totalInsumos,
-    etapas,
+    etapas: etapasConCajas,
     mermas,
     insumos,
     cuartos_frio: cuartosFrio,
   };
+};
+
+// Reemplaza el desglose de cajas de una etapa (delete-then-insert, igual que la receta de
+// etapas por producto): mas simple que un CRUD incremental fila por fila.
+const replacePackingDetailForStage = async (connection, idEtapa, cajas, userId) => {
+  if (cajas === undefined) {
+    // El cliente no esta tocando el desglose de cajas en esta llamada (ej. solo edito
+    // personal_asignado): no se borra lo que ya existia.
+    return;
+  }
+
+  await connection.query(`DELETE FROM ${PACKING_DETAIL_TABLE} WHERE id_etapa = ?`, [idEtapa]);
+
+  if (!Array.isArray(cajas) || cajas.length === 0) {
+    return;
+  }
+
+  for (const caja of cajas) {
+    await connection.query(
+      `INSERT INTO ${PACKING_DETAIL_TABLE} (id_etapa, cantidad_redes, peso_kg, id_usuario_modificacion) VALUES (?, ?, ?, ?)`,
+      [idEtapa, caja.cantidad_redes, caja.peso_kg, userId ?? null]
+    );
+  }
 };
 
 const recomputeStageMermaAndSalida = async (connection, idEtapa, userId) => {
@@ -134,6 +197,33 @@ const recomputeStageMermaAndSalida = async (connection, idEtapa, userId) => {
   });
 };
 
+// Si el producto resultado tiene un plan de etapas definido, solo se puede registrar/editar
+// una etapa cuyo tipo forme parte de ese plan (no se permite "usar procesos diferentes" a los
+// planificados). Un producto sin plan definido (productos creados antes de exigirlo) no se
+// restringe, para no romper produccion en curso sobre esos productos legados.
+const assertStageBelongsToProductPlan = async (connection, idProductoResultado, idTipoEtapa) => {
+  if (!idProductoResultado) {
+    return;
+  }
+
+  const [requiredStageRows] = await connection.query(
+    `SELECT id_tipo_etapa FROM ${PRODUCT_STAGE_REQUIREMENTS_TABLE} WHERE id_producto = ?`,
+    [idProductoResultado]
+  );
+
+  if (requiredStageRows.length === 0) {
+    return;
+  }
+
+  const allowedTypeIds = requiredStageRows.map((row) => row.id_tipo_etapa);
+
+  if (!allowedTypeIds.includes(Number(idTipoEtapa))) {
+    // No se hace rollback aqui: el try/catch del handler que llama a este helper ya se
+    // encarga de eso cuando el error se propaga.
+    throw new Error('La etapa seleccionada no forma parte del plan de proceso definido para este producto');
+  }
+};
+
 const handlers = {
   'productionProcesses.findAll': async () => {
     const [rows] = await pool.query(productionProcessListQuery);
@@ -145,6 +235,10 @@ const handlers = {
   },
   'productionProcesses.reportProduccionPorProducto': async () => {
     const [rows] = await pool.query(productionReportQueries.produccionPorProducto);
+    return rows;
+  },
+  'productionProcesses.reportProductividad': async ({ agrupacion }) => {
+    const [rows] = await pool.query(productivityReportQuery(agrupacion));
     return rows;
   },
   'productionProcesses.findById': async ({ id }) => {
@@ -167,12 +261,18 @@ const handlers = {
       await connection.beginTransaction();
 
       const [sublotRows] = await connection.query(productionProcessQueries.findSublotForUpdate, [id_sublote]);
-      if (sublotRows.length === 0 || sublotRows[0].estado_registro !== SUBLOT_READY_STATE) {
+      const sublot = sublotRows[0];
+      // Un sub-lote normalmente debe estar "Listo para produccion" (madurez completa), pero un
+      // sub-lote Verde aun "Activo" tambien puede entrar (ej. empaque en red de fruta verde,
+      // que se vende tal cual en vez de esperar a que madure) — mismo mecanismo por debajo.
+      const isReadySublot = Boolean(sublot) && sublot.estado_registro === SUBLOT_READY_STATE;
+      const isGreenActiveSublot =
+        Boolean(sublot) && sublot.estado_registro === SUBLOT_ACTIVE_STATE && sublot.estado_maduracion === GREEN_RIPENESS_STATE;
+
+      if (!sublot || !(isReadySublot || isGreenActiveSublot)) {
         await connection.rollback();
         return null;
       }
-
-      const sublot = sublotRows[0];
       const availableKg = Number(sublot.peso_kg);
       const requestedKg = Number(cantidad_ingresada_kg);
 
@@ -205,7 +305,7 @@ const handlers = {
       }
 
       const nextWeight = availableKg - requestedKg;
-      const nextState = nextWeight <= 0 ? SUBLOT_SENT_STATE : SUBLOT_READY_STATE;
+      const nextState = nextWeight <= 0 ? SUBLOT_SENT_STATE : sublot.estado_registro;
 
       await connection.query(
         `UPDATE ${MATURATION_SUBLOT_TABLE} SET peso_kg = ?, estado_registro = ?, id_usuario_modificacion = ? WHERE id_sublote = ?`,
@@ -277,6 +377,7 @@ const handlers = {
     fecha_inicio,
     cantidad_entrada_kg,
     observaciones,
+    cajas,
     id_usuario_modificacion,
   }) => {
     const connection = await pool.getConnection();
@@ -289,6 +390,8 @@ const handlers = {
         await connection.rollback();
         return null;
       }
+
+      await assertStageBelongsToProductPlan(connection, processRows[0].id_producto_resultado, id_tipo_etapa);
 
       const [result] = await connection.query(
         `INSERT INTO ${PRODUCTION_STAGE_TABLE} (id_proceso, id_tipo_etapa, cantidad_personas, personal_asignado, fecha_inicio, cantidad_entrada_kg, observaciones, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -305,7 +408,10 @@ const handlers = {
         ]
       );
 
+      await replacePackingDetailForStage(connection, result.insertId, cajas, id_usuario_modificacion);
+
       const [createdStageRows] = await connection.query(productionStageQueries.findById, [result.insertId]);
+      const [createdCajas] = await connection.query(packingDetailQueries.findByEtapa, [result.insertId]);
 
       await recordAudit(connection, {
         table: PRODUCTION_STAGE_TABLE,
@@ -317,7 +423,7 @@ const handlers = {
       });
 
       await connection.commit();
-      return createdStageRows[0] || null;
+      return createdStageRows[0] ? { ...createdStageRows[0], cajas: createdCajas } : null;
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -335,6 +441,7 @@ const handlers = {
     fecha_fin,
     cantidad_entrada_kg,
     observaciones,
+    cajas,
     id_usuario_modificacion,
   }) => {
     const connection = await pool.getConnection();
@@ -343,6 +450,12 @@ const handlers = {
       await connection.beginTransaction();
 
       const [beforeRows] = await connection.query(productionStageQueries.findById, [id_etapa]);
+
+      const [processRows] = await connection.query(
+        `SELECT id_producto_resultado FROM ${PRODUCTION_TABLE} WHERE id_proceso = ?`,
+        [id]
+      );
+      await assertStageBelongsToProductPlan(connection, processRows[0]?.id_producto_resultado, id_tipo_etapa);
 
       const [result] = await connection.query(
         `UPDATE ${PRODUCTION_STAGE_TABLE} SET id_tipo_etapa = ?, cantidad_personas = ?, personal_asignado = ?, fecha_inicio = ?, fecha_fin = ?, cantidad_entrada_kg = ?, observaciones = ?, id_usuario_modificacion = ? WHERE id_etapa = ? AND id_proceso = ? AND estado_registro = '${ACTIVE_STATE}'`,
@@ -379,11 +492,13 @@ const handlers = {
       // La merma y la salida se derivan siempre de las mermas categorizadas registradas
       // para esta etapa (produccion_mermas), nunca de lo que envie el cliente.
       await recomputeStageMermaAndSalida(connection, id_etapa, id_usuario_modificacion);
+      await replacePackingDetailForStage(connection, id_etapa, cajas, id_usuario_modificacion);
 
       await connection.commit();
 
       const [rows] = await pool.query(productionStageQueries.findById, [id_etapa]);
-      return rows[0] || null;
+      const [updatedCajas] = await pool.query(packingDetailQueries.findByEtapa, [id_etapa]);
+      return rows[0] ? { ...rows[0], cajas: updatedCajas } : null;
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -597,6 +712,42 @@ const handlers = {
         throw new Error(
           `El peso no cuadra: ingresado (${inputKg.toFixed(2)} kg) - mermas (${totalMermaKg.toFixed(2)} kg) = ${expectedOutputKg.toFixed(2)} kg, pero se reporto ${outputKg.toFixed(2)} kg. Debes justificar la diferencia de ${differenceKg.toFixed(2)} kg.`
         );
+      }
+
+      // Si el producto resultado tiene una receta de etapas definida, se exige que todas se
+      // hayan registrado y en el orden indicado antes de poder finalizar el proceso.
+      const [requiredStageRows] = await connection.query(
+        `SELECT r.id_tipo_etapa, cte.nombre_etapa FROM ${PRODUCT_STAGE_REQUIREMENTS_TABLE} r LEFT JOIN ${CAT_STAGE_TABLE} cte ON cte.id_tipo_etapa = r.id_tipo_etapa WHERE r.id_producto = ? ORDER BY r.orden ASC`,
+        [process.id_producto_resultado]
+      );
+
+      if (requiredStageRows.length > 0) {
+        const [recordedStageRows] = await connection.query(
+          `SELECT id_tipo_etapa FROM ${PRODUCTION_STAGE_TABLE} WHERE id_proceso = ? AND estado_registro = '${ACTIVE_STATE}' ORDER BY fecha_inicio ASC, id_etapa ASC`,
+          [id]
+        );
+        const recordedTypeIds = recordedStageRows.map((row) => row.id_tipo_etapa);
+
+        const missingStages = requiredStageRows.filter((req) => !recordedTypeIds.includes(req.id_tipo_etapa));
+
+        if (missingStages.length > 0) {
+          await connection.rollback();
+          throw new Error(
+            `Faltan etapas requeridas para este producto: ${missingStages.map((r) => r.nombre_etapa).join(', ')}`
+          );
+        }
+
+        let lastPosition = -1;
+        for (const req of requiredStageRows) {
+          const position = recordedTypeIds.indexOf(req.id_tipo_etapa);
+
+          if (position < lastPosition) {
+            await connection.rollback();
+            throw new Error('Las etapas no se completaron en el orden requerido para este producto');
+          }
+
+          lastPosition = position;
+        }
       }
 
       await connection.query(

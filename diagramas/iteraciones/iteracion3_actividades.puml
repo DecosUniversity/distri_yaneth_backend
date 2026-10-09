@@ -1,0 +1,36 @@
+@startuml iteracion3_actividades
+' Iteración 3 - Actividades: proceso de producción del sub-lote
+skinparam shadowing false
+skinparam ArrowColor #4D4D4D
+skinparam activity {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+  DiamondBackgroundColor #FFFFFF
+  DiamondBorderColor #4D4D4D
+  StartColor #4D4D4D
+  EndColor #4D4D4D
+  BarColor #4D4D4D
+}
+
+start
+:Recibir sub-lote "Listo para Proceso";
+
+if (Estado del sub-lote) then (verde)
+  :Empacar "Plátano verde en red"\n(registrar peso por unidad empacada);
+elseif (sarazo / maduro) then
+  repeat
+    :Registrar etapa (Pelado, Corte, Fritura, Empaque)\ncon tiempos y personal asignado;
+    :Declarar mermas por etapa\n(catálogo dinámico de tipos de merma);
+    :Registrar consumo de insumos\n(aceite, bolsas de empaque y de basura);
+  repeat while (¿Quedan etapas?) is (sí)
+  :Calcular rendimiento neto y balance de masa\n(ingresado vs. producido vs. mermas);
+else (sobremaduro)
+  :Registrar pérdida por sobremaduración;
+  stop
+endif
+
+:Registrar ingreso a cuarto de congelado\n(ubicación y hora - cadena de frío);
+:Actualizar inventario de producto terminado;
+stop
+
+@enduml

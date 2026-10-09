@@ -1,0 +1,36 @@
+@startuml iteracion5_casos_de_uso
+' Iteración 5 - Módulo de Reportería y Dashboard de Rendimiento (REQ005 / CU005)
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam actorStyle hollow
+left to right direction
+skinparam actor {
+  BorderColor #4D4D4D
+  BackgroundColor #F2F2F2
+}
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+  ArrowColor #4D4D4D
+}
+skinparam rectangle {
+  BorderColor #4D4D4D
+  BackgroundColor #FFFFFF
+}
+
+actor "Gerencia" as G
+
+rectangle "**//Módulo de Reportería y Dashboard de Rendimiento//**" {
+  usecase "Visualizar Dashboard de Indicadores\n(producción, mermas, ventas)" as UC_Dash
+  usecase "Aplicar Filtros de Análisis\n(fecha, cliente, tipo de merma)" as UC_Filtros
+  usecase "Generar Reporte Detallado\n(inventario valorizado, trazabilidad de lote,\neficiencia de flota)" as UC_Rep
+  usecase "Exportar Información (PDF / Excel)" as UC_Exp
+}
+
+G --> UC_Dash
+G --> UC_Rep
+UC_Dash --> UC_Filtros
+UC_Rep --> UC_Filtros
+UC_Rep --> UC_Exp
+
+@enduml

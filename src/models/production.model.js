@@ -12,6 +12,10 @@ const reportProduccionPorProducto = async () => {
   return enqueueDbJob('productionProcesses.reportProduccionPorProducto', {});
 };
 
+const reportProductividad = async (agrupacion) => {
+  return enqueueDbJob('productionProcesses.reportProductividad', { agrupacion });
+};
+
 const findById = async (id) => {
   return enqueueDbJob('productionProcesses.findById', { id });
 };
@@ -90,4 +94,5 @@ module.exports = {
   revert,
   reportMermasPorCategoria,
   reportProduccionPorProducto,
+  reportProductividad,
 };

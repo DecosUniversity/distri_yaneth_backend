@@ -1,0 +1,38 @@
+@startuml cu004_caso_de_uso
+' CU004 - Logística y Distribución (REQ004)
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #EAF2FB
+  BorderColor #2E75B6
+  ArrowColor #2E75B6
+}
+top to bottom direction
+
+actor "Administrador" as Admin
+actor "Piloto" as Piloto
+
+rectangle "Logística y Distribución" {
+  usecase "Gestionar Pedidos y Rutas" as UC_Pedidos
+  usecase "Confirmar Entregas" as UC_Confirmar
+  usecase "Marcar Entrega Parcial/Rechazada" as UC_Parcial
+  usecase "Recepcionar Devolución en Bodega" as UC_Recep
+  usecase "Resolver Devolución" as UC_Resolver
+}
+
+Admin --> UC_Pedidos
+Piloto --> UC_Confirmar
+Piloto --> UC_Parcial
+Admin --> UC_Recep
+Admin --> UC_Resolver
+
+UC_Parcial ..> UC_Confirmar : <<extend>>
+UC_Parcial ..> UC_Recep : <<include>>
+UC_Recep ..> UC_Resolver : <<include>>
+
+note right of UC_Resolver
+  Dos pasos: recepción física en bodega y luego
+  resolución (reingresa a inventario o se declara pérdida).
+end note
+
+@enduml
