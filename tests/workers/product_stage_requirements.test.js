@@ -121,7 +121,7 @@ describe('productionProcesses.finalize - validacion de receta de etapas', () => 
     expect(rows[0].estado_proceso).toBe('En proceso');
   });
 
-  it('bloquea finalizar si las etapas se completaron en un orden distinto al de la receta', async () => {
+  it('bloquea registrar una etapa fuera de orden (ya no se puede ni crear, no solo falla al finalizar)', async () => {
     await requirementHandlers['productStageRequirements.replaceForProduct']({
       id_producto: baseline.idProductoTerminado,
       etapas: [baseline.idTipoEtapa, idSegundaEtapa],
@@ -129,9 +129,56 @@ describe('productionProcesses.finalize - validacion de receta de etapas', () => 
     });
 
     const process = await startProcess(50);
-    // Se registran al reves: Corte antes que Pelado.
-    await addStage(process.id_proceso, idSegundaEtapa);
+    // Intentar registrar Corte antes que Pelado debe rechazarse de inmediato.
+    await expect(addStage(process.id_proceso, idSegundaEtapa)).rejects.toThrow(/Debes registrar primero/);
+  });
+
+  it('bloquea registrar una etapa con fecha_inicio anterior a la etapa previa del plan, aunque ya exista', async () => {
+    await requirementHandlers['productStageRequirements.replaceForProduct']({
+      id_producto: baseline.idProductoTerminado,
+      etapas: [baseline.idTipoEtapa, idSegundaEtapa],
+      id_usuario_modificacion: baseline.idUsuario,
+    });
+
+    const process = await startProcess(50);
+    const pelado = await handlers['productionProcesses.addStage']({
+      id: process.id_proceso,
+      id_tipo_etapa: baseline.idTipoEtapa,
+      cantidad_personas: 2,
+      fecha_inicio: new Date('2027-01-01T12:00:00Z'),
+      id_usuario_modificacion: baseline.idUsuario,
+    });
+    expect(pelado.id_tipo_etapa).toBe(baseline.idTipoEtapa);
+
+    // Corte ya existe como siguiente paso del plan, pero con una fecha anterior a Pelado.
+    await expect(
+      handlers['productionProcesses.addStage']({
+        id: process.id_proceso,
+        id_tipo_etapa: idSegundaEtapa,
+        cantidad_personas: 2,
+        fecha_inicio: new Date('2027-01-01T11:00:00Z'),
+        id_usuario_modificacion: baseline.idUsuario,
+      })
+    ).rejects.toThrow(/fecha de inicio de esta etapa no puede ser anterior/);
+  });
+
+  it('bloquea finalizar si las etapas quedaron en un orden distinto al de la receta por fecha_inicio', async () => {
+    await requirementHandlers['productStageRequirements.replaceForProduct']({
+      id_producto: baseline.idProductoTerminado,
+      etapas: [baseline.idTipoEtapa, idSegundaEtapa],
+      id_usuario_modificacion: baseline.idUsuario,
+    });
+
+    const process = await startProcess(50);
     await addStage(process.id_proceso, baseline.idTipoEtapa);
+    await addStage(process.id_proceso, idSegundaEtapa);
+
+    // Se fuerza el desorden directo en la base (ej. dato legado de antes de esta validacion),
+    // para comprobar que finalize sigue siendo una segunda barrera de seguridad.
+    await pool.query(
+      `UPDATE produccion_etapas SET fecha_inicio = DATE_SUB(fecha_inicio, INTERVAL 1 DAY) WHERE id_proceso = ? AND id_tipo_etapa = ?`,
+      [process.id_proceso, idSegundaEtapa]
+    );
 
     await expect(
       handlers['productionProcesses.finalize']({

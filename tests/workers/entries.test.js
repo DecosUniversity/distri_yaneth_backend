@@ -1,4 +1,5 @@
-const { pool, resetDatabase, seedBaseline } = require('../helpers/db');
+const { pool, resetDatabase, seedBaseline, getStoredPhaseCode } = require('../helpers/db');
+const { formatPhaseCode } = require('../../src/workers/shared/phaseCode');
 const { handlers } = require('../../src/workers/domains/entradas_mercancia.worker.js');
 
 let baseline;
@@ -30,6 +31,7 @@ describe('entries.create - materia prima', () => {
     expect(lotRows).toHaveLength(1);
     expect(Number(lotRows[0].peso_inicial_kg)).toBe(100);
     expect(lotRows[0].estado_registro).toBe('Pendiente');
+    expect(await getStoredPhaseCode('lote', lotRows[0].id_lote_mp)).toBe(formatPhaseCode('lote', lotRows[0].id_lote_mp));
   });
 
   it('usa la sumatoria de pesos de las unidades cuando se proporcionan', async () => {
@@ -74,10 +76,13 @@ describe('entries.create - materia prima', () => {
     ]);
     expect(lotRows).toHaveLength(0);
 
-    const [existenciaRows] = await pool.query('SELECT cantidad_disponible FROM inventario_existencias WHERE id_entrada_origen = ?', [
+    const [existenciaRows] = await pool.query('SELECT id_existencia, cantidad_disponible FROM inventario_existencias WHERE id_entrada_origen = ?', [
       created.id_entrada,
     ]);
     expect(existenciaRows).toHaveLength(1);
+    expect(await getStoredPhaseCode('existencia', existenciaRows[0].id_existencia)).toBe(
+      formatPhaseCode('existencia', existenciaRows[0].id_existencia)
+    );
   });
 
   it('reutiliza la existencia y recalcula el costo promedio en una segunda entrada del mismo producto/proveedor', async () => {

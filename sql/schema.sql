@@ -1,5 +1,5 @@
 -- Schema consolidado de produccion (banano/platano) - generado automaticamente
--- Fecha de generacion: 2026-09-08
+-- Fecha de generacion: 2026-10-09
 -- Uso: crear la base de datos vacia y ejecutar este archivo completo para levantar el esquema.
 -- No incluye datos ni usuarios. Crea un usuario Administrador despues de desplegar (ver nota al final).
 
@@ -24,7 +24,25 @@ CREATE TABLE `auditoria_cambios` (
   KEY `idx_auditoria_tabla_registro` (`tabla_afectada`,`id_registro_afectado`),
   KEY `idx_auditoria_fecha` (`fecha_accion`),
   CONSTRAINT `fk_auditoria_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=1612 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ----------------------------
+-- Tabla: cat_cuartos_frio
+-- ----------------------------
+DROP TABLE IF EXISTS `cat_cuartos_frio`;
+CREATE TABLE `cat_cuartos_frio` (
+  `id_cuarto_frio` int(11) NOT NULL AUTO_INCREMENT,
+  `nombre_cuarto` varchar(100) NOT NULL,
+  `descripcion` varchar(150) DEFAULT NULL,
+  `estado_registro` enum('Activo','Inactivo') NOT NULL DEFAULT 'Activo',
+  `fecha_creacion` timestamp NOT NULL DEFAULT current_timestamp(),
+  `fecha_modificacion` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `id_usuario_modificacion` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id_cuarto_frio`),
+  UNIQUE KEY `uq_cat_cuartos_frio_nombre` (`nombre_cuarto`),
+  KEY `fk_cat_cuartos_frio_usuario_mod` (`id_usuario_modificacion`),
+  CONSTRAINT `fk_cat_cuartos_frio_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: cat_tipos_etapa
@@ -42,7 +60,7 @@ CREATE TABLE `cat_tipos_etapa` (
   UNIQUE KEY `uq_cat_tipos_etapa_nombre` (`nombre_etapa`),
   KEY `fk_cat_tipos_etapa_usuario_mod` (`id_usuario_modificacion`),
   CONSTRAINT `fk_cat_tipos_etapa_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: cat_tipos_merma
@@ -59,7 +77,7 @@ CREATE TABLE `cat_tipos_merma` (
   PRIMARY KEY (`id_tipo_merma`),
   KEY `fk_cat_tipos_merma_usuario_mod` (`id_usuario_modificacion`),
   CONSTRAINT `fk_cat_tipos_merma_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: clientes
@@ -80,7 +98,7 @@ CREATE TABLE `clientes` (
   PRIMARY KEY (`id_cliente`),
   KEY `fk_clientes_usuario_mod` (`id_usuario_modificacion`),
   CONSTRAINT `fk_clientes_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=50 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: control_maduracion
@@ -94,15 +112,18 @@ CREATE TABLE `control_maduracion` (
   `peso_medido_kg` decimal(10,2) DEFAULT NULL,
   `porcentaje_materia_seca` decimal(5,2) DEFAULT NULL,
   `temperatura_cuarto` decimal(5,2) DEFAULT NULL,
+  `id_cuarto_frio` int(11) DEFAULT NULL,
   `observaciones` text DEFAULT NULL,
   `id_usuario_modificacion` int(11) DEFAULT NULL,
   `fecha_modificacion` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id_control`),
   KEY `fk_control_sublote` (`id_sublote`),
   KEY `fk_control_maduracion_usuario_mod` (`id_usuario_modificacion`),
+  KEY `fk_control_maduracion_cuarto_frio` (`id_cuarto_frio`),
+  CONSTRAINT `fk_control_maduracion_cuarto_frio` FOREIGN KEY (`id_cuarto_frio`) REFERENCES `cat_cuartos_frio` (`id_cuarto_frio`),
   CONSTRAINT `fk_control_maduracion_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`),
   CONSTRAINT `fk_control_sublote` FOREIGN KEY (`id_sublote`) REFERENCES `sublotes_maduracion` (`id_sublote`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: devoluciones_pedido
@@ -125,7 +146,7 @@ CREATE TABLE `devoluciones_pedido` (
   CONSTRAINT `fk_devolucion_detalle` FOREIGN KEY (`id_detalle`) REFERENCES `pedido_detalle` (`id_detalle`),
   CONSTRAINT `fk_devolucion_recepcion` FOREIGN KEY (`id_usuario_recepcion`) REFERENCES `usuarios` (`id_usuario`),
   CONSTRAINT `fk_devolucion_resolucion` FOREIGN KEY (`id_usuario_resolucion`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: entradas_mercancia
@@ -151,7 +172,7 @@ CREATE TABLE `entradas_mercancia` (
   CONSTRAINT `entradas_mercancia_ibfk_1` FOREIGN KEY (`id_proveedor`) REFERENCES `proveedores` (`id_proveedor`),
   CONSTRAINT `entradas_mercancia_ibfk_2` FOREIGN KEY (`id_usuario_receptor`) REFERENCES `usuarios` (`id_usuario`),
   CONSTRAINT `fk_entradas_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=140 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: entrada_unidades
@@ -169,7 +190,7 @@ CREATE TABLE `entrada_unidades` (
   PRIMARY KEY (`id`),
   KEY `idx_entrada_unidades_id_entrada` (`id_entrada`),
   CONSTRAINT `fk_entrada` FOREIGN KEY (`id_entrada`) REFERENCES `entradas_mercancia` (`id_entrada`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=110 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: etapas_empaque_detalle
@@ -197,6 +218,7 @@ CREATE TABLE `etapas_empaque_detalle` (
 DROP TABLE IF EXISTS `inventario_existencias`;
 CREATE TABLE `inventario_existencias` (
   `id_existencia` int(11) NOT NULL AUTO_INCREMENT,
+  `codigo_trazabilidad` varchar(16) DEFAULT NULL,
   `id_producto` int(11) DEFAULT NULL,
   `id_proveedor` int(11) DEFAULT NULL,
   `id_proceso_origen` int(11) DEFAULT NULL,
@@ -209,6 +231,7 @@ CREATE TABLE `inventario_existencias` (
   `fecha_modificacion` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `id_usuario_modificacion` int(11) DEFAULT NULL,
   PRIMARY KEY (`id_existencia`),
+  UNIQUE KEY `uq_inventario_existencias_codigo` (`codigo_trazabilidad`),
   KEY `id_producto` (`id_producto`),
   KEY `id_proveedor` (`id_proveedor`),
   KEY `id_proceso_origen` (`id_proceso_origen`),
@@ -219,7 +242,7 @@ CREATE TABLE `inventario_existencias` (
   CONSTRAINT `inventario_existencias_ibfk_2` FOREIGN KEY (`id_proveedor`) REFERENCES `proveedores` (`id_proveedor`),
   CONSTRAINT `inventario_existencias_ibfk_3` FOREIGN KEY (`id_proceso_origen`) REFERENCES `procesos_produccion` (`id_proceso`),
   CONSTRAINT `inventario_existencias_ibfk_4` FOREIGN KEY (`id_entrada_origen`) REFERENCES `entradas_mercancia` (`id_entrada`)
-) ENGINE=InnoDB AUTO_INCREMENT=57 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: lotes_materia_prima
@@ -227,6 +250,7 @@ CREATE TABLE `inventario_existencias` (
 DROP TABLE IF EXISTS `lotes_materia_prima`;
 CREATE TABLE `lotes_materia_prima` (
   `id_lote_mp` int(11) NOT NULL AUTO_INCREMENT,
+  `codigo_trazabilidad` varchar(16) DEFAULT NULL,
   `id_producto` int(11) DEFAULT NULL,
   `id_proveedor` int(11) DEFAULT NULL,
   `id_entrada_origen` int(11) DEFAULT NULL,
@@ -238,6 +262,7 @@ CREATE TABLE `lotes_materia_prima` (
   `fecha_modificacion` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `id_usuario_modificacion` int(11) DEFAULT NULL,
   PRIMARY KEY (`id_lote_mp`),
+  UNIQUE KEY `uq_lotes_materia_prima_codigo` (`codigo_trazabilidad`),
   KEY `id_producto` (`id_producto`),
   KEY `id_proveedor` (`id_proveedor`),
   KEY `fk_lotes_entrada_origen` (`id_entrada_origen`),
@@ -246,7 +271,7 @@ CREATE TABLE `lotes_materia_prima` (
   CONSTRAINT `fk_lotes_mp_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`),
   CONSTRAINT `lotes_materia_prima_ibfk_1` FOREIGN KEY (`id_producto`) REFERENCES `productos` (`id_producto`),
   CONSTRAINT `lotes_materia_prima_ibfk_2` FOREIGN KEY (`id_proveedor`) REFERENCES `proveedores` (`id_proveedor`)
-) ENGINE=InnoDB AUTO_INCREMENT=117 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: movimientos_inventario
@@ -267,7 +292,7 @@ CREATE TABLE `movimientos_inventario` (
   KEY `id_usuario` (`id_usuario`),
   CONSTRAINT `movimientos_inventario_ibfk_1` FOREIGN KEY (`id_existencia`) REFERENCES `inventario_existencias` (`id_existencia`),
   CONSTRAINT `movimientos_inventario_ibfk_2` FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=388 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: ordenes_produccion
@@ -293,7 +318,7 @@ CREATE TABLE `ordenes_produccion` (
   CONSTRAINT `fk_ordenes_produccion_producto` FOREIGN KEY (`id_producto`) REFERENCES `productos` (`id_producto`),
   CONSTRAINT `fk_ordenes_produccion_usuario_creacion` FOREIGN KEY (`id_usuario_creacion`) REFERENCES `usuarios` (`id_usuario`),
   CONSTRAINT `fk_ordenes_produccion_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: pedidos
@@ -301,6 +326,7 @@ CREATE TABLE `ordenes_produccion` (
 DROP TABLE IF EXISTS `pedidos`;
 CREATE TABLE `pedidos` (
   `id_pedido` int(11) NOT NULL AUTO_INCREMENT,
+  `codigo_trazabilidad` varchar(16) DEFAULT NULL,
   `id_cliente` int(11) NOT NULL,
   `estado` enum('Pendiente','Preparado','En Ruta','Entregado','Con Devolucion','Cancelado') NOT NULL DEFAULT 'Pendiente',
   `observaciones` text DEFAULT NULL,
@@ -312,13 +338,14 @@ CREATE TABLE `pedidos` (
   `fecha_modificacion` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `fecha_entrega` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id_pedido`),
+  UNIQUE KEY `uq_pedidos_codigo` (`codigo_trazabilidad`),
   KEY `fk_pedido_cliente` (`id_cliente`),
   KEY `fk_pedido_usuario` (`id_usuario_creacion`),
   KEY `fk_pedido_usuario_mod` (`id_usuario_modificacion`),
   CONSTRAINT `fk_pedido_cliente` FOREIGN KEY (`id_cliente`) REFERENCES `clientes` (`id_cliente`),
   CONSTRAINT `fk_pedido_usuario` FOREIGN KEY (`id_usuario_creacion`) REFERENCES `usuarios` (`id_usuario`),
   CONSTRAINT `fk_pedido_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: pedido_detalle
@@ -340,7 +367,7 @@ CREATE TABLE `pedido_detalle` (
   CONSTRAINT `fk_detalle_existencia` FOREIGN KEY (`id_existencia`) REFERENCES `inventario_existencias` (`id_existencia`),
   CONSTRAINT `fk_detalle_pedido` FOREIGN KEY (`id_pedido`) REFERENCES `pedidos` (`id_pedido`),
   CONSTRAINT `fk_detalle_producto` FOREIGN KEY (`id_producto`) REFERENCES `productos` (`id_producto`)
-) ENGINE=InnoDB AUTO_INCREMENT=46 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: procesos_produccion
@@ -348,6 +375,7 @@ CREATE TABLE `pedido_detalle` (
 DROP TABLE IF EXISTS `procesos_produccion`;
 CREATE TABLE `procesos_produccion` (
   `id_proceso` int(11) NOT NULL AUTO_INCREMENT,
+  `codigo_trazabilidad` varchar(16) DEFAULT NULL,
   `id_sublote` int(11) DEFAULT NULL,
   `id_producto_resultado` int(11) DEFAULT NULL,
   `id_orden` int(11) DEFAULT NULL,
@@ -369,6 +397,7 @@ CREATE TABLE `procesos_produccion` (
   `justificacion_diferencia` text DEFAULT NULL,
   `justificacion_reversion` text DEFAULT NULL,
   PRIMARY KEY (`id_proceso`),
+  UNIQUE KEY `uq_procesos_produccion_codigo` (`codigo_trazabilidad`),
   KEY `id_lote_mp` (`id_sublote`),
   KEY `fk_produccion_producto` (`id_producto_resultado`),
   KEY `fk_produccion_usuario` (`id_usuario_registro`),
@@ -379,7 +408,7 @@ CREATE TABLE `procesos_produccion` (
   CONSTRAINT `fk_produccion_producto` FOREIGN KEY (`id_producto_resultado`) REFERENCES `productos` (`id_producto`),
   CONSTRAINT `fk_produccion_sublote` FOREIGN KEY (`id_sublote`) REFERENCES `sublotes_maduracion` (`id_sublote`),
   CONSTRAINT `fk_produccion_usuario` FOREIGN KEY (`id_usuario_registro`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=55 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: produccion_cuartos_frio
@@ -388,6 +417,7 @@ DROP TABLE IF EXISTS `produccion_cuartos_frio`;
 CREATE TABLE `produccion_cuartos_frio` (
   `id_ingreso_cuarto` int(11) NOT NULL AUTO_INCREMENT,
   `id_proceso` int(11) NOT NULL,
+  `id_cuarto_frio` int(11) DEFAULT NULL,
   `fecha_ingreso` datetime NOT NULL DEFAULT current_timestamp(),
   `ubicacion_cuarto` varchar(120) NOT NULL,
   `cantidad_kg` decimal(10,2) NOT NULL,
@@ -399,6 +429,8 @@ CREATE TABLE `produccion_cuartos_frio` (
   PRIMARY KEY (`id_ingreso_cuarto`),
   KEY `fk_produccion_cuartos_proceso` (`id_proceso`),
   KEY `fk_produccion_cuartos_frio_usuario_mod` (`id_usuario_modificacion`),
+  KEY `fk_produccion_cuartos_frio_tipo` (`id_cuarto_frio`),
+  CONSTRAINT `fk_produccion_cuartos_frio_tipo` FOREIGN KEY (`id_cuarto_frio`) REFERENCES `cat_cuartos_frio` (`id_cuarto_frio`),
   CONSTRAINT `fk_produccion_cuartos_frio_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`),
   CONSTRAINT `fk_produccion_cuartos_proceso` FOREIGN KEY (`id_proceso`) REFERENCES `procesos_produccion` (`id_proceso`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -430,7 +462,7 @@ CREATE TABLE `produccion_etapas` (
   CONSTRAINT `fk_produccion_etapas_proceso` FOREIGN KEY (`id_proceso`) REFERENCES `procesos_produccion` (`id_proceso`),
   CONSTRAINT `fk_produccion_etapas_tipo` FOREIGN KEY (`id_tipo_etapa`) REFERENCES `cat_tipos_etapa` (`id_tipo_etapa`),
   CONSTRAINT `fk_produccion_etapas_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=40 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: produccion_insumos
@@ -458,7 +490,7 @@ CREATE TABLE `produccion_insumos` (
   CONSTRAINT `fk_produccion_insumos_proceso` FOREIGN KEY (`id_proceso`) REFERENCES `procesos_produccion` (`id_proceso`),
   CONSTRAINT `fk_produccion_insumos_producto` FOREIGN KEY (`id_producto`) REFERENCES `productos` (`id_producto`),
   CONSTRAINT `fk_produccion_insumos_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: produccion_mermas
@@ -485,7 +517,7 @@ CREATE TABLE `produccion_mermas` (
   CONSTRAINT `fk_produccion_mermas_proceso` FOREIGN KEY (`id_proceso`) REFERENCES `procesos_produccion` (`id_proceso`),
   CONSTRAINT `fk_produccion_mermas_tipo` FOREIGN KEY (`id_tipo_merma`) REFERENCES `cat_tipos_merma` (`id_tipo_merma`),
   CONSTRAINT `fk_produccion_mermas_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=26 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: productos
@@ -505,7 +537,7 @@ CREATE TABLE `productos` (
   PRIMARY KEY (`id_producto`),
   KEY `fk_productos_usuario_mod` (`id_usuario_modificacion`),
   CONSTRAINT `fk_productos_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=41 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: producto_etapas_requeridas
@@ -527,7 +559,7 @@ CREATE TABLE `producto_etapas_requeridas` (
   CONSTRAINT `fk_petapas_producto` FOREIGN KEY (`id_producto`) REFERENCES `productos` (`id_producto`),
   CONSTRAINT `fk_petapas_tipo_etapa` FOREIGN KEY (`id_tipo_etapa`) REFERENCES `cat_tipos_etapa` (`id_tipo_etapa`),
   CONSTRAINT `fk_petapas_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: proveedores
@@ -545,7 +577,7 @@ CREATE TABLE `proveedores` (
   PRIMARY KEY (`id_proveedor`),
   KEY `fk_proveedores_usuario_mod` (`id_usuario_modificacion`),
   CONSTRAINT `fk_proveedores_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=28 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: recetas
@@ -569,6 +601,7 @@ CREATE TABLE `recetas` (
 DROP TABLE IF EXISTS `redes_verde_detalle`;
 CREATE TABLE `redes_verde_detalle` (
   `id_red` int(11) NOT NULL AUTO_INCREMENT,
+  `codigo_trazabilidad` varchar(16) DEFAULT NULL,
   `id_sublote` int(11) NOT NULL,
   `id_existencia` int(11) NOT NULL,
   `peso_kg` decimal(10,2) NOT NULL,
@@ -576,13 +609,14 @@ CREATE TABLE `redes_verde_detalle` (
   `fecha_empaque` timestamp NOT NULL DEFAULT current_timestamp(),
   `cantidad_redes` int(11) NOT NULL DEFAULT 1,
   PRIMARY KEY (`id_red`),
+  UNIQUE KEY `uq_redes_verde_detalle_codigo` (`codigo_trazabilidad`),
   KEY `fk_red_sublote` (`id_sublote`),
   KEY `fk_red_existencia` (`id_existencia`),
   KEY `fk_red_usuario` (`id_usuario`),
   CONSTRAINT `fk_red_existencia` FOREIGN KEY (`id_existencia`) REFERENCES `inventario_existencias` (`id_existencia`),
   CONSTRAINT `fk_red_sublote` FOREIGN KEY (`id_sublote`) REFERENCES `sublotes_maduracion` (`id_sublote`),
   CONSTRAINT `fk_red_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: reporte_kilometraje_vehiculo
@@ -599,7 +633,7 @@ CREATE TABLE `reporte_kilometraje_vehiculo` (
   KEY `fk_reporte_kilometraje_usuario` (`id_usuario_modificador`),
   CONSTRAINT `fk_reporte_kilometraje_usuario` FOREIGN KEY (`id_usuario_modificador`) REFERENCES `usuarios` (`id_usuario`),
   CONSTRAINT `fk_reporte_kilometraje_vehiculo` FOREIGN KEY (`id_vehiculo`) REFERENCES `vehiculos` (`id_vehiculo`)
-) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: rutas_entrega
@@ -629,7 +663,7 @@ CREATE TABLE `rutas_entrega` (
   CONSTRAINT `fk_ruta_usuario` FOREIGN KEY (`id_usuario_creacion`) REFERENCES `usuarios` (`id_usuario`),
   CONSTRAINT `fk_ruta_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`),
   CONSTRAINT `fk_ruta_vehiculo` FOREIGN KEY (`id_vehiculo`) REFERENCES `vehiculos` (`id_vehiculo`)
-) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: ruta_pedidos
@@ -667,7 +701,7 @@ CREATE TABLE `servicios_vehiculo` (
   CONSTRAINT `fk_servicios_vehiculo_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`),
   CONSTRAINT `servicios_vehiculo_ibfk_1` FOREIGN KEY (`id_vehiculo`) REFERENCES `vehiculos` (`id_vehiculo`),
   CONSTRAINT `servicios_vehiculo_ibfk_2` FOREIGN KEY (`id_tipo_servicio`) REFERENCES `tipos_servicio` (`id_tipo_servicio`)
-) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: sublotes_maduracion
@@ -675,6 +709,7 @@ CREATE TABLE `servicios_vehiculo` (
 DROP TABLE IF EXISTS `sublotes_maduracion`;
 CREATE TABLE `sublotes_maduracion` (
   `id_sublote` int(11) NOT NULL AUTO_INCREMENT,
+  `codigo_trazabilidad` varchar(16) DEFAULT NULL,
   `id_lote_mp` int(11) NOT NULL,
   `codigo_sublote` varchar(10) NOT NULL DEFAULT 'A',
   `peso_inicial_kg` decimal(10,2) NOT NULL,
@@ -689,11 +724,12 @@ CREATE TABLE `sublotes_maduracion` (
   `fecha_modificacion` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `id_usuario_modificacion` int(11) DEFAULT NULL,
   PRIMARY KEY (`id_sublote`),
+  UNIQUE KEY `uq_sublotes_maduracion_codigo` (`codigo_trazabilidad`),
   KEY `fk_sublote_lote` (`id_lote_mp`),
   KEY `fk_sublotes_usuario_mod` (`id_usuario_modificacion`),
   CONSTRAINT `fk_sublote_lote` FOREIGN KEY (`id_lote_mp`) REFERENCES `lotes_materia_prima` (`id_lote_mp`),
   CONSTRAINT `fk_sublotes_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=94 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: tipos_servicio
@@ -709,7 +745,7 @@ CREATE TABLE `tipos_servicio` (
   PRIMARY KEY (`id_tipo_servicio`),
   KEY `fk_tipos_servicio_usuario_mod` (`id_usuario_modificacion`),
   CONSTRAINT `fk_tipos_servicio_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=26 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: usuarios
@@ -729,7 +765,7 @@ CREATE TABLE `usuarios` (
   UNIQUE KEY `username` (`username`),
   KEY `fk_usuarios_usuario_mod` (`id_usuario_modificacion`),
   CONSTRAINT `fk_usuarios_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=27 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Tabla: vehiculos
@@ -748,7 +784,7 @@ CREATE TABLE `vehiculos` (
   UNIQUE KEY `placa` (`placa`),
   KEY `fk_vehiculos_usuario_mod` (`id_usuario_modificacion`),
   CONSTRAINT `fk_vehiculos_usuario_mod` FOREIGN KEY (`id_usuario_modificacion`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=30 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
 

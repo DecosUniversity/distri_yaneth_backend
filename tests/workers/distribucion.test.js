@@ -1,4 +1,5 @@
-const { pool, resetDatabase, seedBaseline } = require('../helpers/db');
+const { pool, resetDatabase, seedBaseline, getStoredPhaseCode } = require('../helpers/db');
+const { formatPhaseCode } = require('../../src/workers/shared/phaseCode');
 const { createVehicle, createPilot, createOrderWithLines, createFinishedProductStock } = require('../helpers/fixtures');
 const { handlers: orderHandlers } = require('../../src/workers/domains/order.worker.js');
 const { handlers: routeHandlers } = require('../../src/workers/domains/route.worker.js');
@@ -32,6 +33,7 @@ describe('orders.create: asignacion de lote (existencia)', () => {
     });
 
     expect(order.lineas[0].id_existencia).toBe(idViejo);
+    expect(await getStoredPhaseCode('pedido', order.id_pedido)).toBe(formatPhaseCode('pedido', order.id_pedido));
 
     const [movementRows] = await pool.query(
       "SELECT cantidad, tipo_movimiento FROM movimientos_inventario WHERE id_existencia = ? AND motivo LIKE 'Venta pedido%'",
@@ -548,6 +550,33 @@ describe('devoluciones', () => {
     expect(movementRows).toHaveLength(1);
     expect(movementRows[0].id_existencia).toBe(idExistencia);
     expect(Number(movementRows[0].cantidad)).toBe(7);
+  });
+
+  it('si el producto ya no tiene ningun lote activo, el reingreso crea una existencia nueva con su codigo', async () => {
+    const order = await setupConDevolucion();
+    const created = await returnHandlers['orderReturns.create']({
+      id_detalle: order.idDetalle,
+      cantidad_devuelta: 7,
+      id_usuario_recepcion: baseline.idUsuario,
+    });
+
+    // Sin lotes activos del producto, resolve no puede reutilizar ninguno: debe insertar uno.
+    await pool.query("UPDATE inventario_existencias SET estado_registro = 'Inactivo' WHERE id_producto = ?", [
+      baseline.idProductoTerminado,
+    ]);
+
+    await returnHandlers['orderReturns.resolve']({
+      id: created.id_devolucion,
+      resolucion: 'Reingresado a inventario',
+      id_usuario_resolucion: baseline.idUsuario,
+    });
+
+    const [movementRows] = await pool.query('SELECT id_existencia FROM movimientos_inventario WHERE motivo = ?', [
+      `Reingreso por devolucion #${created.id_devolucion}`,
+    ]);
+    expect(movementRows).toHaveLength(1);
+    const idNueva = movementRows[0].id_existencia;
+    expect(await getStoredPhaseCode('existencia', idNueva)).toBe(formatPhaseCode('existencia', idNueva));
   });
 
   it('recibe la devolucion y la resuelve como Reingresado, creando el movimiento de entrada', async () => {

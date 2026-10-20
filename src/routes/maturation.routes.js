@@ -304,19 +304,23 @@ router.get('/controles/sublote/:id_sublote', maturationController.getControlesBy
  *         application/json:
  *           schema:
  *             type: object
- *             required: [id_sublote, grados_brix]
+ *             required: [id_sublote, grados_brix, temperatura_cuarto]
  *             properties:
  *               id_sublote: { type: integer }
  *               grados_brix: { type: number }
  *               peso_medido_kg: { type: number, nullable: true }
  *               porcentaje_materia_seca: { type: number, nullable: true }
- *               temperatura_cuarto: { type: number, nullable: true }
+ *               temperatura_cuarto: { type: number }
+ *               id_cuarto_frio:
+ *                 type: integer
+ *                 nullable: true
+ *                 description: Opcional. Cuarto frio del catalogo /api/produccion/cuartos-frio
  *               observaciones: { type: string }
  *     responses:
  *       201:
  *         description: Control registrado
  *       400:
- *         description: Datos invalidos
+ *         description: Datos invalidos (incluye temperatura faltante o cuarto frio inexistente/inactivo)
  *       404:
  *         description: Sub-lote no encontrado
  */

@@ -11,6 +11,7 @@ const BUSINESS_RULE_MESSAGES = [
   'Se requiere peso_medido_kg para cerrar la maduracion; no hay mediciones previas con peso capturado',
   'El peso medido no puede ser mayor al peso disponible del sub-lote',
   'El peso a fraccionar supera el peso disponible del sub-lote',
+  'El cuarto frio seleccionado no existe',
 ];
 
 const emptyToNull = (value) => (value === undefined || value === null || value === '' ? null : value);
@@ -115,8 +116,19 @@ const validateControlPayload = (payload) => {
     return 'porcentaje_materia_seca debe ser numerico';
   }
 
-  if (parsedTemperatura !== null && Number.isNaN(Number(parsedTemperatura))) {
+  // La temperatura siempre se pide; el cuarto frio es opcional (no todo sub-lote madura en uno).
+  if (parsedTemperatura === null) {
+    return 'temperatura_cuarto es obligatoria';
+  }
+
+  if (Number.isNaN(Number(parsedTemperatura))) {
     return 'temperatura_cuarto debe ser numerica';
+  }
+
+  const parsedCuartoFrio = emptyToNull(payload.id_cuarto_frio);
+
+  if (parsedCuartoFrio !== null && !(Number.parseInt(parsedCuartoFrio, 10) > 0)) {
+    return 'id_cuarto_frio debe ser valido';
   }
 
   return null;
@@ -129,6 +141,7 @@ const normalizeControlPayload = (payload) => ({
   porcentaje_materia_seca:
     emptyToNull(payload.porcentaje_materia_seca) === null ? null : Number(payload.porcentaje_materia_seca),
   temperatura_cuarto: emptyToNull(payload.temperatura_cuarto) === null ? null : Number(payload.temperatura_cuarto),
+  id_cuarto_frio: emptyToNull(payload.id_cuarto_frio) === null ? null : Number.parseInt(payload.id_cuarto_frio, 10),
   observaciones:
     typeof payload.observaciones === 'string' && payload.observaciones.trim() ? payload.observaciones.trim() : null,
 });
@@ -448,7 +461,7 @@ const createControl = async (req, res, next) => {
     });
     return res.status(201).json(newControl);
   } catch (error) {
-    return next(error);
+    return handleMaturationError(error, res, next);
   }
 };
 

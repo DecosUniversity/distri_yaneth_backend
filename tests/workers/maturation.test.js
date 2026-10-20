@@ -1,4 +1,5 @@
-const { pool, resetDatabase, seedBaseline } = require('../helpers/db');
+const { pool, resetDatabase, seedBaseline, getStoredPhaseCode } = require('../helpers/db');
+const { formatPhaseCode } = require('../../src/workers/shared/phaseCode');
 const { handlers } = require('../../src/workers/domains/maturation.worker.js');
 
 let baseline;
@@ -46,6 +47,9 @@ describe('maturationLots.accept', () => {
     expect(sublote).not.toBeNull();
     expect(sublote.estado_registro).toBe('Listo para produccion');
     expect(Number(sublote.peso_neto_maduracion_kg)).toBe(100);
+    // Tanto el lote (maturationLots.create) como el sub-lote (accept) guardan su codigo.
+    expect(await getStoredPhaseCode('lote', lot.id_lote_mp)).toBe(formatPhaseCode('lote', lot.id_lote_mp));
+    expect(await getStoredPhaseCode('sublote', sublote.id_sublote)).toBe(formatPhaseCode('sublote', sublote.id_sublote));
     expect(Number(sublote.perdida_maduracion_kg)).toBe(0);
 
     const [existenciaRows] = await pool.query(
@@ -109,6 +113,7 @@ describe('maturationSublots.split', () => {
     expect(Number(origen.peso_kg)).toBe(60);
     expect(Number(nuevo.peso_kg)).toBe(40);
     expect(nuevo.codigo_sublote).toBe('A2');
+    expect(await getStoredPhaseCode('sublote', nuevo.id_sublote)).toBe(formatPhaseCode('sublote', nuevo.id_sublote));
     // 20 unidades originales -> 40/100 = 40% -> 8 unidades al nuevo, 12 al origen
     expect(origen.cantidad_unidades).toBe(12);
     expect(nuevo.cantidad_unidades).toBe(8);
@@ -207,5 +212,66 @@ describe('maturationControls.create', () => {
       sublote.id_sublote,
     ]);
     expect(sublotRows[0].estado_registro).toBe('Activo');
+  });
+
+  it('guarda el cuarto frio opcional y devuelve su nombre', async () => {
+    const lot = await createPendingLot(100);
+    const sublote = await handlers['maturationLots.accept']({
+      id: lot.id_lote_mp,
+      estado_maduracion: 'Verde',
+      id_usuario_modificacion: baseline.idUsuario,
+    });
+    const [coldRoom] = await pool.query(
+      "INSERT INTO cat_cuartos_frio (nombre_cuarto, estado_registro) VALUES ('Cuarto de prueba', 'Activo')"
+    );
+
+    const conCuarto = await handlers['maturationControls.create']({
+      id_sublote: sublote.id_sublote,
+      grados_brix: 15,
+      temperatura_cuarto: 12.5,
+      id_cuarto_frio: coldRoom.insertId,
+      id_usuario_modificacion: baseline.idUsuario,
+    });
+
+    expect(conCuarto.id_cuarto_frio).toBe(coldRoom.insertId);
+    expect(conCuarto.cuarto_frio_nombre).toBe('Cuarto de prueba');
+    expect(Number(conCuarto.temperatura_cuarto)).toBe(12.5);
+
+    const sinCuarto = await handlers['maturationControls.create']({
+      id_sublote: sublote.id_sublote,
+      grados_brix: 16,
+      temperatura_cuarto: 13,
+      id_usuario_modificacion: baseline.idUsuario,
+    });
+
+    expect(sinCuarto.id_cuarto_frio).toBeNull();
+    expect(sinCuarto.cuarto_frio_nombre).toBeNull();
+  });
+
+  it('rechaza un cuarto frio inactivo sin registrar el control', async () => {
+    const lot = await createPendingLot(100);
+    const sublote = await handlers['maturationLots.accept']({
+      id: lot.id_lote_mp,
+      estado_maduracion: 'Verde',
+      id_usuario_modificacion: baseline.idUsuario,
+    });
+    const [coldRoom] = await pool.query(
+      "INSERT INTO cat_cuartos_frio (nombre_cuarto, estado_registro) VALUES ('Cuarto dado de baja', 'Inactivo')"
+    );
+
+    await expect(
+      handlers['maturationControls.create']({
+        id_sublote: sublote.id_sublote,
+        grados_brix: 15,
+        temperatura_cuarto: 12,
+        id_cuarto_frio: coldRoom.insertId,
+        id_usuario_modificacion: baseline.idUsuario,
+      })
+    ).rejects.toThrow('El cuarto frio seleccionado no existe');
+
+    const [controlRows] = await pool.query('SELECT COUNT(*) AS total FROM control_maduracion WHERE id_sublote = ?', [
+      sublote.id_sublote,
+    ]);
+    expect(controlRows[0].total).toBe(0);
   });
 });

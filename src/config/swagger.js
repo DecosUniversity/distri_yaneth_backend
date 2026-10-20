@@ -205,6 +205,15 @@ const options = {
             estado_registro: { type: 'string', enum: ['Activo', 'Inactivo'] },
           },
         },
+        CuartoFrio: {
+          type: 'object',
+          properties: {
+            id_cuarto_frio: { type: 'integer' },
+            nombre_cuarto: { type: 'string' },
+            descripcion: { type: 'string' },
+            estado_registro: { type: 'string', enum: ['Activo', 'Inactivo'] },
+          },
+        },
         ProcesoProduccion: {
           type: 'object',
           properties: {
@@ -303,15 +312,15 @@ const options = {
             cantidad_producida_kg: { type: 'number' },
             fecha_fin: { type: 'string', format: 'date-time' },
             fecha_vencimiento: { type: 'string', format: 'date' },
-            cuarto_congelado: { type: 'string' },
-            ubicacion_cuarto_congelado: { type: 'string' },
-            costo_unitario: { type: 'number' },
             observaciones: { type: 'string' },
             justificacion_diferencia: {
               type: 'string',
               description: 'Obligatoria si la diferencia entre ingresado-mermas y producido supera la tolerancia.',
             },
           },
+          description:
+            'El costo unitario del lote se toma del precio de venta sugerido del producto, y la ubicacion de ' +
+            'cuarto frio de los ingresos ya registrados en "Registrar cuarto frio": ninguno de los dos se envia aqui.',
         },
       },
     },

@@ -13,6 +13,7 @@ const MATURATION_CONTROL_TABLE = process.env.DB_MATURATION_CONTROL_TABLE || 'con
 const GREEN_NET_TABLE = process.env.DB_GREEN_NET_TABLE || 'redes_verde_detalle';
 const CAT_MERMA_TABLE = process.env.DB_CAT_MERMA_TABLE || 'cat_tipos_merma';
 const CAT_STAGE_TABLE = process.env.DB_CAT_STAGE_TABLE || 'cat_tipos_etapa';
+const CAT_COLD_ROOM_TABLE = process.env.DB_CAT_COLD_ROOM_TABLE || 'cat_cuartos_frio';
 const PRODUCTION_ORDERS_TABLE = process.env.DB_PRODUCTION_ORDERS_TABLE || 'ordenes_produccion';
 const PRODUCTION_TABLE = process.env.DB_PRODUCTION_TABLE || 'procesos_produccion';
 const PRODUCTION_STAGE_TABLE = process.env.DB_PRODUCTION_STAGE_TABLE || 'produccion_etapas';
@@ -88,6 +89,7 @@ module.exports = {
   GREEN_NET_TABLE,
   CAT_MERMA_TABLE,
   CAT_STAGE_TABLE,
+  CAT_COLD_ROOM_TABLE,
   PRODUCTION_ORDERS_TABLE,
   PRODUCTION_TABLE,
   PRODUCTION_STAGE_TABLE,

@@ -9,6 +9,7 @@ const {
   MATURATION_SUBLOT_TABLE,
   CAT_MERMA_TABLE,
   CAT_STAGE_TABLE,
+  CAT_COLD_ROOM_TABLE,
   PRODUCTION_TABLE,
   PRODUCTION_STAGE_TABLE,
   PRODUCTION_MERMA_TABLE,
@@ -30,6 +31,7 @@ const {
   GREEN_RIPENESS_STATE,
   BALANCE_TOLERANCE_KG,
 } = require('../shared/constants');
+const { assignPhaseCode } = require('../shared/phaseCode');
 const { normalizeNullableText } = require('../shared/helpers');
 const { AUDIT_ACTION_CREATE, AUDIT_ACTION_UPDATE, AUDIT_ACTION_DELETE, recordAudit } = require('../shared/audit');
 
@@ -85,8 +87,8 @@ const packingDetailQueries = {
 };
 
 const productionColdRoomQueries = {
-  findByProcess: `SELECT c.id_ingreso_cuarto, c.id_proceso, c.fecha_ingreso, c.ubicacion_cuarto, c.cantidad_kg, c.observaciones, c.estado_registro, c.fecha_creacion, c.fecha_modificacion, c.id_usuario_modificacion, um.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTION_COLD_ROOM_TABLE} c LEFT JOIN ${USERS_TABLE} um ON um.id_usuario = c.id_usuario_modificacion WHERE c.id_proceso = ? AND c.estado_registro = '${ACTIVE_STATE}' ORDER BY c.fecha_ingreso DESC, c.id_ingreso_cuarto DESC`,
-  findById: `SELECT c.id_ingreso_cuarto, c.id_proceso, c.fecha_ingreso, c.ubicacion_cuarto, c.cantidad_kg, c.observaciones, c.estado_registro, c.fecha_creacion, c.fecha_modificacion, c.id_usuario_modificacion, um.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTION_COLD_ROOM_TABLE} c LEFT JOIN ${USERS_TABLE} um ON um.id_usuario = c.id_usuario_modificacion WHERE c.id_ingreso_cuarto = ?`,
+  findByProcess: `SELECT c.id_ingreso_cuarto, c.id_proceso, c.id_cuarto_frio, c.fecha_ingreso, c.ubicacion_cuarto, c.cantidad_kg, c.observaciones, c.estado_registro, c.fecha_creacion, c.fecha_modificacion, c.id_usuario_modificacion, um.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTION_COLD_ROOM_TABLE} c LEFT JOIN ${USERS_TABLE} um ON um.id_usuario = c.id_usuario_modificacion WHERE c.id_proceso = ? AND c.estado_registro = '${ACTIVE_STATE}' ORDER BY c.fecha_ingreso DESC, c.id_ingreso_cuarto DESC`,
+  findById: `SELECT c.id_ingreso_cuarto, c.id_proceso, c.id_cuarto_frio, c.fecha_ingreso, c.ubicacion_cuarto, c.cantidad_kg, c.observaciones, c.estado_registro, c.fecha_creacion, c.fecha_modificacion, c.id_usuario_modificacion, um.nombre_completo AS usuario_modificacion_nombre FROM ${PRODUCTION_COLD_ROOM_TABLE} c LEFT JOIN ${USERS_TABLE} um ON um.id_usuario = c.id_usuario_modificacion WHERE c.id_ingreso_cuarto = ?`,
 };
 
 const productionProcessQueries = {
@@ -224,6 +226,61 @@ const assertStageBelongsToProductPlan = async (connection, idProductoResultado, 
   }
 };
 
+// Ademas de pertenecer al plan, una etapa nueva solo se puede registrar si TODAS las etapas que
+// la preceden en el plan ya se registraron, y con una fecha de inicio que no quede antes que la
+// de esa etapa previa. Esto obliga a que el orden de captura (y no solo el de finalizar) respete
+// el plan, para no repetir el caso de "Corte" quedando antes que "Pelado" por fecha_inicio. Solo
+// aplica si el producto tiene un plan definido (igual criterio que assertStageBelongsToProductPlan).
+const assertStageOrderRespected = async (connection, idProceso, idProductoResultado, idTipoEtapa, fechaInicio) => {
+  if (!idProductoResultado) {
+    return;
+  }
+
+  const [planRows] = await connection.query(
+    `SELECT r.id_tipo_etapa, cte.nombre_etapa FROM ${PRODUCT_STAGE_REQUIREMENTS_TABLE} r LEFT JOIN ${CAT_STAGE_TABLE} cte ON cte.id_tipo_etapa = r.id_tipo_etapa WHERE r.id_producto = ? ORDER BY r.orden ASC`,
+    [idProductoResultado]
+  );
+
+  const targetIndex = planRows.findIndex((row) => row.id_tipo_etapa === Number(idTipoEtapa));
+
+  if (targetIndex <= 0) {
+    // No esta en el plan (ya fallo antes en assertStageBelongsToProductPlan) o es la primera
+    // etapa del plan: no hay nada previo que exigir.
+    return;
+  }
+
+  const priorStages = planRows.slice(0, targetIndex);
+
+  const [recordedRows] = await connection.query(
+    `SELECT id_tipo_etapa, fecha_inicio FROM ${PRODUCTION_STAGE_TABLE} WHERE id_proceso = ? AND estado_registro = '${ACTIVE_STATE}'`,
+    [idProceso]
+  );
+
+  const latestStartByType = new Map();
+  for (const row of recordedRows) {
+    const current = latestStartByType.get(row.id_tipo_etapa);
+    if (!current || new Date(row.fecha_inicio) > new Date(current)) {
+      latestStartByType.set(row.id_tipo_etapa, row.fecha_inicio);
+    }
+  }
+
+  const missingPrior = priorStages.filter((stage) => !latestStartByType.has(stage.id_tipo_etapa));
+
+  if (missingPrior.length > 0) {
+    throw new Error(`Debes registrar primero: ${missingPrior.map((stage) => stage.nombre_etapa).join(', ')}`);
+  }
+
+  if (fechaInicio) {
+    const latestPriorStart = Math.max(
+      ...priorStages.map((stage) => new Date(latestStartByType.get(stage.id_tipo_etapa)).getTime())
+    );
+
+    if (new Date(fechaInicio).getTime() < latestPriorStart) {
+      throw new Error('La fecha de inicio de esta etapa no puede ser anterior a la etapa previa del plan');
+    }
+  }
+};
+
 const handlers = {
   'productionProcesses.findAll': async () => {
     const [rows] = await pool.query(productionProcessListQuery);
@@ -341,6 +398,8 @@ const handlers = {
         ]
       );
 
+      await assignPhaseCode(connection, 'proceso', result.insertId);
+
       const [createdProcessRows] = await connection.query(productionProcessQueries.findById, [result.insertId]);
 
       await recordAudit(connection, {
@@ -392,6 +451,7 @@ const handlers = {
       }
 
       await assertStageBelongsToProductPlan(connection, processRows[0].id_producto_resultado, id_tipo_etapa);
+      await assertStageOrderRespected(connection, id, processRows[0].id_producto_resultado, id_tipo_etapa, fecha_inicio);
 
       const [result] = await connection.query(
         `INSERT INTO ${PRODUCTION_STAGE_TABLE} (id_proceso, id_tipo_etapa, cantidad_personas, personal_asignado, fecha_inicio, cantidad_entrada_kg, observaciones, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -598,7 +658,7 @@ const handlers = {
       connection.release();
     }
   },
-  'productionProcesses.addColdRoomEntry': async ({ id, fecha_ingreso, ubicacion_cuarto, cantidad_kg, observaciones, id_usuario_modificacion }) => {
+  'productionProcesses.addColdRoomEntry': async ({ id, fecha_ingreso, id_cuarto_frio, cantidad_kg, observaciones, id_usuario_modificacion }) => {
     const connection = await pool.getConnection();
 
     try {
@@ -610,9 +670,25 @@ const handlers = {
         return null;
       }
 
+      // La ubicacion ya no es texto libre: se elige de un catalogo (cat_cuartos_frio, igual que
+      // las categorias de merma) para que quede categorizada y no un dato al azar. El nombre se
+      // copia a ubicacion_cuarto para no tener que tocar los reportes/trazabilidad que ya leen
+      // esa columna de texto.
+      const [coldRoomTypeRows] = await connection.query(
+        `SELECT nombre_cuarto FROM ${CAT_COLD_ROOM_TABLE} WHERE id_cuarto_frio = ? AND estado_registro = '${ACTIVE_STATE}'`,
+        [id_cuarto_frio]
+      );
+
+      if (coldRoomTypeRows.length === 0) {
+        await connection.rollback();
+        throw new Error('El cuarto frio seleccionado no existe');
+      }
+
+      const ubicacionCuarto = coldRoomTypeRows[0].nombre_cuarto;
+
       const [result] = await connection.query(
-        `INSERT INTO ${PRODUCTION_COLD_ROOM_TABLE} (id_proceso, fecha_ingreso, ubicacion_cuarto, cantidad_kg, observaciones, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [id, fecha_ingreso, ubicacion_cuarto, cantidad_kg, normalizeNullableText(observaciones), ACTIVE_STATE, id_usuario_modificacion ?? null]
+        `INSERT INTO ${PRODUCTION_COLD_ROOM_TABLE} (id_proceso, id_cuarto_frio, fecha_ingreso, ubicacion_cuarto, cantidad_kg, observaciones, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, id_cuarto_frio, fecha_ingreso, ubicacionCuarto, cantidad_kg, normalizeNullableText(observaciones), ACTIVE_STATE, id_usuario_modificacion ?? null]
       );
 
       const [createdColdRoomRows] = await connection.query(productionColdRoomQueries.findById, [result.insertId]);
@@ -630,7 +706,7 @@ const handlers = {
 
       await connection.query(
         `UPDATE ${PRODUCTION_TABLE} SET cuarto_congelado = COALESCE(?, cuarto_congelado), ubicacion_cuarto_congelado = COALESCE(?, ubicacion_cuarto_congelado), id_usuario_modificacion = ? WHERE id_proceso = ?`,
-        [ubicacion_cuarto, ubicacion_cuarto, id_usuario_modificacion ?? null, id]
+        [ubicacionCuarto, ubicacionCuarto, id_usuario_modificacion ?? null, id]
       );
 
       const [updatedProcessRows] = await connection.query(productionProcessQueries.findById, [id]);
@@ -658,10 +734,7 @@ const handlers = {
     cantidad_producida_kg,
     fecha_fin,
     fecha_vencimiento,
-    cuarto_congelado,
-    ubicacion_cuarto_congelado,
     observaciones,
-    costo_unitario,
     justificacion_diferencia,
     id_usuario_modificacion,
   }) => {
@@ -750,14 +823,24 @@ const handlers = {
         }
       }
 
+      // La ubicacion de cuarto frio ya no se escribe a mano al finalizar: se toma de los
+      // ingresos a cuarto frio ya registrados para este proceso (tabla produccion_cuartos_frio,
+      // llenada con "Registrar cuarto frio"). Si no hay ninguno registrado, se deja como estaba.
+      const [coldRoomEntryRows] = await connection.query(
+        `SELECT DISTINCT ubicacion_cuarto FROM ${PRODUCTION_COLD_ROOM_TABLE} WHERE id_proceso = ? AND estado_registro = '${ACTIVE_STATE}' ORDER BY ubicacion_cuarto ASC`,
+        [id]
+      );
+      const ubicacionCuartoCongelado =
+        coldRoomEntryRows.length > 0 ? coldRoomEntryRows.map((row) => row.ubicacion_cuarto).join(', ') : null;
+
       await connection.query(
         `UPDATE ${PRODUCTION_TABLE} SET cantidad_producida_kg = ?, rendimiento_porcentaje = ?, estado_proceso = '${PRODUCTION_FINISHED_STATE}', fecha_fin = ?, cuarto_congelado = COALESCE(?, cuarto_congelado), ubicacion_cuarto_congelado = COALESCE(?, ubicacion_cuarto_congelado), observaciones = COALESCE(?, observaciones), diferencia_kg = ?, justificacion_diferencia = ?, id_usuario_modificacion = ? WHERE id_proceso = ?`,
         [
           outputKg,
           rendimiento,
           fecha_fin,
-          normalizeNullableText(cuarto_congelado),
-          normalizeNullableText(ubicacion_cuarto_congelado),
+          ubicacionCuartoCongelado,
+          ubicacionCuartoCongelado,
           normalizeNullableText(observaciones),
           differenceKg,
           justification,
@@ -807,6 +890,15 @@ const handlers = {
         );
         const supplierId = lotRows[0]?.id_proveedor ?? null;
 
+        // El costo del lote producido no lo captura Produccion a mano: se toma el precio de
+        // venta sugerido que ya tiene definido el producto en su catalogo, para no dejar que
+        // cada persona que finaliza un proceso termine fijando un costo distinto.
+        const [resultProductRows] = await connection.query(
+          `SELECT precio_venta_sugerido FROM ${PRODUCTS_TABLE} WHERE id_producto = ?`,
+          [process.id_producto_resultado]
+        );
+        const costoUnitario = resultProductRows[0]?.precio_venta_sugerido ?? null;
+
         const [existingInventoryRows] = await connection.query(
           `SELECT id_existencia FROM ${INVENTORY_TABLE} WHERE id_proceso_origen = ? AND id_producto = ? AND estado_registro = '${ACTIVE_STATE}' LIMIT 1`,
           [id, process.id_producto_resultado]
@@ -824,7 +916,7 @@ const handlers = {
 
           await connection.query(
             `UPDATE ${INVENTORY_TABLE} SET id_proveedor = ?, fecha_vencimiento = ?, costo_unitario = COALESCE(?, costo_unitario), estado_registro = '${ACTIVE_STATE}', id_usuario_modificacion = ? WHERE id_existencia = ?`,
-            [supplierId, fecha_vencimiento, costo_unitario ?? null, id_usuario_modificacion ?? null, existenceId]
+            [supplierId, fecha_vencimiento, costoUnitario, id_usuario_modificacion ?? null, existenceId]
           );
 
           const [inventoryAfterRows] = await connection.query(
@@ -843,9 +935,10 @@ const handlers = {
         } else {
           const [existenceResult] = await connection.query(
             `INSERT INTO ${INVENTORY_TABLE} (id_producto, id_proveedor, id_proceso_origen, id_entrada_origen, fecha_vencimiento, cantidad_disponible, costo_unitario, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
-            [process.id_producto_resultado, supplierId, id, fecha_vencimiento, 0, costo_unitario ?? null, ACTIVE_STATE, id_usuario_modificacion ?? null]
+            [process.id_producto_resultado, supplierId, id, fecha_vencimiento, 0, costoUnitario, ACTIVE_STATE, id_usuario_modificacion ?? null]
           );
           existenceId = existenceResult.insertId;
+          await assignPhaseCode(connection, 'existencia', existenceId);
 
           const [inventoryCreatedRows] = await connection.query(
             `SELECT * FROM ${INVENTORY_TABLE} WHERE id_existencia = ?`,

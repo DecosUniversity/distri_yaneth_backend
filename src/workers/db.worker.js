@@ -11,6 +11,7 @@ const { handlers: inventoryHandlers } = require('./domains/inventory.worker');
 const { handlers: productHandlers } = require('./domains/product.worker');
 const { handlers: serviceTypeHandlers } = require('./domains/service_type.worker');
 const { handlers: mermaTypeHandlers } = require('./domains/merma_type.worker');
+const { handlers: coldRoomTypeHandlers } = require('./domains/cold_room_type.worker');
 const { handlers: stageTypeHandlers } = require('./domains/stage_type.worker');
 const { handlers: maturationHandlers } = require('./domains/maturation.worker');
 const { handlers: greenNetHandlers } = require('./domains/green_net.worker');
@@ -35,6 +36,7 @@ const handlers = {
   ...productHandlers,
   ...serviceTypeHandlers,
   ...mermaTypeHandlers,
+  ...coldRoomTypeHandlers,
   ...stageTypeHandlers,
   ...maturationHandlers,
   ...greenNetHandlers,

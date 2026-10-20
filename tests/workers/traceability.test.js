@@ -211,6 +211,40 @@ describe('traceability.search', () => {
     const results = await traceHandlers['traceability.search']({ q: String(chain.subloteProduccion.id_sublote) });
     expect(results.some((row) => row.tipo === 'sublote' && row.id === chain.subloteProduccion.id_sublote)).toBe(true);
   });
+
+  it('un codigo de fase devuelve solo esa fase, en cualquier formato aceptado', async () => {
+    const id = chain.subloteProduccion.id_sublote;
+    const expectedCode = `SUB-${String(id).padStart(6, '0')}`;
+
+    for (const q of [expectedCode, `SUB-${id}`, `sub${id}`]) {
+      const results = await traceHandlers['traceability.search']({ q });
+      expect(results).toEqual([expect.objectContaining({ tipo: 'sublote', id, codigo: expectedCode })]);
+    }
+
+    const procesoResults = await traceHandlers['traceability.search']({ q: `PRO-${chain.proceso.id_proceso}` });
+    expect(procesoResults).toEqual([expect.objectContaining({ tipo: 'proceso', id: chain.proceso.id_proceso })]);
+  });
+
+  it('un codigo de fase inexistente no devuelve resultados', async () => {
+    expect(await traceHandlers['traceability.search']({ q: 'SUB-999999' })).toEqual([]);
+  });
+});
+
+describe('phaseCode', () => {
+  const { formatPhaseCode, parsePhaseCode } = require('../../src/workers/shared/phaseCode');
+
+  it('formatea y vuelve a leer el mismo codigo', () => {
+    expect(formatPhaseCode('lote', 12)).toBe('LMP-000012');
+    expect(parsePhaseCode('LMP-000012')).toEqual({ tipo: 'lote', id: 12 });
+    expect(parsePhaseCode(' red 3 ')).toEqual({ tipo: 'red', id: 3 });
+  });
+
+  it('no confunde un codigo de lote de entrada ni texto libre con un codigo de fase', () => {
+    expect(parsePhaseCode('AGU-261008-002')).toBeNull();
+    expect(parsePhaseCode('Subproducto')).toBeNull();
+    expect(parsePhaseCode('SUB-0')).toBeNull();
+    expect(parsePhaseCode('9')).toBeNull();
+  });
 });
 
 describe('traceability.searchByFilters', () => {

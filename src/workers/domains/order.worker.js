@@ -20,6 +20,7 @@ const {
   ORDER_CON_DEVOLUCION_STATE,
   ORDER_CANCELADO_STATE,
 } = require('../shared/constants');
+const { assignPhaseCode } = require('../shared/phaseCode');
 const { normalizeNullableText } = require('../shared/helpers');
 const { AUDIT_ACTION_CREATE, AUDIT_ACTION_UPDATE, recordAudit } = require('../shared/audit');
 
@@ -229,6 +230,7 @@ const handlers = {
       );
 
       const orderId = result.insertId;
+      await assignPhaseCode(connection, 'pedido', orderId);
 
       for (const linea of lineas) {
         const cantidadSolicitada = Number(linea.cantidad);

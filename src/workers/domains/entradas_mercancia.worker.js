@@ -13,6 +13,7 @@ const {
   PENDING_STATE,
   RAW_MATERIAL_PRODUCT_TYPE,
 } = require('../shared/constants');
+const { assignPhaseCode } = require('../shared/phaseCode');
 const { normalizeNullableText } = require('../shared/helpers');
 const { AUDIT_ACTION_CREATE, AUDIT_ACTION_DELETE, recordAudit } = require('../shared/audit');
 const { generateLotCode } = require('../shared/lotCode');
@@ -124,6 +125,7 @@ const handlers = {
         );
 
         existenciaId = existenceResult.insertId;
+        await assignPhaseCode(connection, 'existencia', existenciaId);
       }
 
       await connection.query(
@@ -172,6 +174,8 @@ const handlers = {
             id_usuario_receptor,
           ]
         );
+
+        await assignPhaseCode(connection, 'lote', lotResult.insertId);
 
         // Si hay unidades, insertarlas en entrada_unidades vinculadas a la entrada creada
         if (Array.isArray(unidades) && unidades.length > 0) {

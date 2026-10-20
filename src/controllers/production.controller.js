@@ -34,13 +34,16 @@ const BUSINESS_RULE_MESSAGES = [
   'El producto del proceso no coincide con el producto de la orden de produccion',
   'Las etapas no se completaron en el orden requerido para este producto',
   'La etapa seleccionada no forma parte del plan de proceso definido para este producto',
+  'El cuarto frio seleccionado no existe',
+  'La fecha de inicio de esta etapa no puede ser anterior a la etapa previa del plan',
 ];
 
 const handleProductionError = (error, res, next) => {
   if (
     BUSINESS_RULE_MESSAGES.includes(error.message) ||
     error.message.startsWith('El peso no cuadra') ||
-    error.message.startsWith('Faltan etapas requeridas')
+    error.message.startsWith('Faltan etapas requeridas') ||
+    error.message.startsWith('Debes registrar primero')
   ) {
     return res.status(400).json({ message: error.message });
   }
@@ -203,13 +206,14 @@ const validateInsumoPayload = (payload) => {
 
 const validateColdRoomPayload = (payload) => {
   const quantity = Number(payload.cantidad_kg);
+  const idCuartoFrio = Number.parseInt(payload.id_cuarto_frio, 10);
 
   if (!payload.fecha_ingreso) {
     return 'fecha_ingreso es obligatoria';
   }
 
-  if (!payload.ubicacion_cuarto || !String(payload.ubicacion_cuarto).trim()) {
-    return 'ubicacion_cuarto es obligatoria';
+  if (Number.isNaN(idCuartoFrio) || idCuartoFrio <= 0) {
+    return 'id_cuarto_frio es obligatorio y debe ser valido';
   }
 
   if (Number.isNaN(quantity) || quantity <= 0) {
@@ -395,7 +399,7 @@ const addEtapa = async (req, res, next) => {
 
     return res.status(201).json(stage);
   } catch (error) {
-    return next(error);
+    return handleProductionError(error, res, next);
   }
 };
 
@@ -438,7 +442,7 @@ const updateEtapa = async (req, res, next) => {
 
     return res.status(200).json(stage);
   } catch (error) {
-    return next(error);
+    return handleProductionError(error, res, next);
   }
 };
 
@@ -534,7 +538,7 @@ const addColdRoomEntry = async (req, res, next) => {
 
     const coldRoom = await productionModel.addColdRoomEntry(id, {
       fecha_ingreso: formatDateTime(req.body.fecha_ingreso),
-      ubicacion_cuarto: String(req.body.ubicacion_cuarto).trim(),
+      id_cuarto_frio: Number.parseInt(req.body.id_cuarto_frio, 10),
       cantidad_kg: Number(req.body.cantidad_kg),
       observaciones: req.body.observaciones,
       id_usuario_modificacion: req.auth?.sub ?? null,
@@ -546,7 +550,7 @@ const addColdRoomEntry = async (req, res, next) => {
 
     return res.status(201).json(coldRoom);
   } catch (error) {
-    return next(error);
+    return handleProductionError(error, res, next);
   }
 };
 
@@ -568,10 +572,7 @@ const finalizeProceso = async (req, res, next) => {
       cantidad_producida_kg: Number(req.body.cantidad_producida_kg),
       fecha_fin: formatDateTime(req.body.fecha_fin),
       fecha_vencimiento: String(req.body.fecha_vencimiento).slice(0, 10),
-      cuarto_congelado: req.body.cuarto_congelado,
-      ubicacion_cuarto_congelado: req.body.ubicacion_cuarto_congelado,
       observaciones: req.body.observaciones,
-      costo_unitario: emptyToNull(req.body.costo_unitario) === null ? null : Number(req.body.costo_unitario),
       justificacion_diferencia: req.body.justificacion_diferencia,
       id_usuario_modificacion: req.auth?.sub ?? null,
     });

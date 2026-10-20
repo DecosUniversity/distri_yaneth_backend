@@ -4,6 +4,7 @@ const { pool } = require('../../src/config/db');
 // evita tener que resolver el orden de dependencias a mano.
 const ALL_TABLES = [
   'auditoria_cambios',
+  'cat_cuartos_frio',
   'cat_tipos_etapa',
   'cat_tipos_merma',
   'clientes',
@@ -116,8 +117,19 @@ const seedBaseline = async () => {
   };
 };
 
+// Codigo de trazabilidad GUARDADO para ese registro (ver src/workers/shared/phaseCode.js).
+// Las pruebas lo comparan con formatPhaseCode para asegurar que cada INSERT llamo a
+// assignPhaseCode (si un camino de creacion lo olvida, aqui queda en null).
+const getStoredPhaseCode = async (tipo, id) => {
+  const { PHASE_CODE_COLUMN, PHASE_CODE_COLUMNS } = require('../../src/workers/shared/phaseCode');
+  const { table, idColumn } = PHASE_CODE_COLUMNS[tipo];
+  const [rows] = await pool.query(`SELECT ${PHASE_CODE_COLUMN} AS codigo FROM ${table} WHERE ${idColumn} = ?`, [id]);
+  return rows[0]?.codigo ?? null;
+};
+
 module.exports = {
   pool,
   resetDatabase,
   seedBaseline,
+  getStoredPhaseCode,
 };

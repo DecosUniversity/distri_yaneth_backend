@@ -9,6 +9,7 @@ const {
   RAW_MATERIAL_LOTS_TABLE,
   MATURATION_SUBLOT_TABLE,
   MATURATION_CONTROL_TABLE,
+  CAT_COLD_ROOM_TABLE,
   GREEN_NET_TABLE,
   CAT_MERMA_TABLE,
   CAT_STAGE_TABLE,
@@ -28,6 +29,7 @@ const {
   FINISHED_PRODUCT_TYPE,
   ORDER_ENTREGADO_STATE,
 } = require('../shared/constants');
+const { findIdByPhaseCode, formatPhaseCode, parsePhaseCode } = require('../shared/phaseCode');
 
 const entradaQuery = `SELECT e.id_entrada, e.id_proveedor, p.nombre_empresa AS proveedor_nombre, e.fecha_recepcion, e.documento_referencia, e.costo_unitario, e.costo_total, e.id_usuario_receptor, u.nombre_completo AS receptor_nombre, e.estado_registro, e.codigo_lote FROM ${ENTRIES_TABLE} e LEFT JOIN ${PROVIDERS_TABLE} p ON p.id_proveedor = e.id_proveedor LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = e.id_usuario_receptor WHERE e.id_entrada = ?`;
 
@@ -37,7 +39,7 @@ const lotesByEntradaQuery = `SELECT l.id_lote_mp, l.id_producto, pr.nombre AS pr
 
 const sublotesByLoteQuery = `SELECT s.id_sublote, s.codigo_sublote, s.peso_inicial_kg, s.peso_kg, s.peso_neto_maduracion_kg, s.perdida_maduracion_kg, s.cantidad_unidades, s.estado_maduracion, s.estado_registro, s.observaciones, s.fecha_creacion FROM ${MATURATION_SUBLOT_TABLE} s WHERE s.id_lote_mp = ? ORDER BY s.codigo_sublote ASC`;
 
-const controlesBySubloteQuery = `SELECT c.id_control, c.fecha_medicion, c.grados_brix, c.peso_medido_kg, c.porcentaje_materia_seca, c.temperatura_cuarto, c.observaciones FROM ${MATURATION_CONTROL_TABLE} c WHERE c.id_sublote = ? ORDER BY c.fecha_medicion ASC`;
+const controlesBySubloteQuery = `SELECT c.id_control, c.fecha_medicion, c.grados_brix, c.peso_medido_kg, c.porcentaje_materia_seca, c.temperatura_cuarto, c.id_cuarto_frio, cf.nombre_cuarto AS cuarto_frio_nombre, c.observaciones FROM ${MATURATION_CONTROL_TABLE} c LEFT JOIN ${CAT_COLD_ROOM_TABLE} cf ON cf.id_cuarto_frio = c.id_cuarto_frio WHERE c.id_sublote = ? ORDER BY c.fecha_medicion ASC`;
 
 const redesBySubloteQuery = `SELECT r.id_red, r.id_existencia, r.peso_kg, r.cantidad_redes, r.fecha_empaque, r.id_usuario, u.nombre_completo AS usuario_nombre FROM ${GREEN_NET_TABLE} r LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = r.id_usuario WHERE r.id_sublote = ? ORDER BY r.id_red ASC`;
 
@@ -223,6 +225,62 @@ const formatDateLabel = (value) => {
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? String(value) : date.toISOString().slice(0, 10);
 };
+
+const withPhaseCodes = (results) => results.map((result) => ({ ...result, codigo: formatPhaseCode(result.tipo, result.id) }));
+
+// Busqueda por ID de una sola fase. La usan tanto el numero suelto (todas las fases) como el
+// codigo de fase (solo la suya). El pedido no tiene arbol propio (puede mezclar varios lotes):
+// se devuelve como resultado informativo, igual que en la busqueda por filtros.
+const SEARCH_BY_ID = {
+  entrada: async (id) => {
+    const [rows] = await pool.query(entradaQuery, [id]);
+    return rows.map((row) => ({
+      tipo: 'entrada',
+      id: row.id_entrada,
+      etiqueta: `Entrada #${row.id_entrada} - ${row.codigo_lote || 'sin codigo'} - ${row.proveedor_nombre || 'Sin proveedor'}`,
+    }));
+  },
+  lote: async (id) => {
+    const [rows] = await pool.query(
+      `SELECT l.id_lote_mp, pr.nombre AS producto_nombre FROM ${RAW_MATERIAL_LOTS_TABLE} l LEFT JOIN ${PRODUCTS_TABLE} pr ON pr.id_producto = l.id_producto WHERE l.id_lote_mp = ?`,
+      [id]
+    );
+    return rows.map((row) => ({ tipo: 'lote', id: row.id_lote_mp, etiqueta: `Lote MP #${row.id_lote_mp} - ${row.producto_nombre || 'Producto sin nombre'}` }));
+  },
+  sublote: async (id) => {
+    const [rows] = await pool.query(`SELECT id_sublote, codigo_sublote FROM ${MATURATION_SUBLOT_TABLE} WHERE id_sublote = ?`, [id]);
+    return rows.map((row) => ({ tipo: 'sublote', id: row.id_sublote, etiqueta: `Sub-lote #${row.id_sublote} (${row.codigo_sublote})` }));
+  },
+  proceso: async (id) => {
+    const [rows] = await pool.query(`SELECT id_proceso FROM ${PRODUCTION_TABLE} WHERE id_proceso = ?`, [id]);
+    return rows.map((row) => ({ tipo: 'proceso', id: row.id_proceso, etiqueta: `Proceso de produccion #${row.id_proceso}` }));
+  },
+  red: async (id) => {
+    const [rows] = await pool.query(`SELECT id_red FROM ${GREEN_NET_TABLE} WHERE id_red = ?`, [id]);
+    return rows.map((row) => ({ tipo: 'red', id: row.id_red, etiqueta: `Red verde #${row.id_red}` }));
+  },
+  existencia: async (id) => {
+    const [rows] = await pool.query(`SELECT id_existencia FROM ${INVENTORY_TABLE} WHERE id_existencia = ?`, [id]);
+    return rows.map((row) => ({ tipo: 'existencia', id: row.id_existencia, etiqueta: `Existencia #${row.id_existencia}` }));
+  },
+  pedido: async (id) => {
+    const [rows] = await pool.query(
+      `SELECT o.id_pedido, o.estado, c.nombre_comercial FROM ${ORDERS_TABLE} o LEFT JOIN ${CLIENTS_TABLE} c ON c.id_cliente = o.id_cliente WHERE o.id_pedido = ? AND o.estado_registro = '${ACTIVE_STATE}'`,
+      [id]
+    );
+    return rows.map((row) => ({
+      tipo: 'pedido',
+      id: row.id_pedido,
+      etiqueta: `Pedido #${row.id_pedido} - ${row.nombre_comercial || 'Cliente sin nombre'}`,
+      detalle: `Estado: ${row.estado}`,
+    }));
+  },
+};
+
+// Un numero suelto se sigue buscando como antes (sin pedidos, que nunca estuvieron aqui).
+const SEARCHABLE_BY_ID_TYPES = ['entrada', 'lote', 'sublote', 'proceso', 'red', 'existencia'];
+
+const findSearchResultsById = (tipo, id) => SEARCH_BY_ID[tipo](id);
 
 const AREA_SEARCHERS = {
   maduracion: async ({ desde, hasta }) => {
@@ -451,56 +509,39 @@ const handlers = {
     const [exactCodeRows] = await pool.query(entradaByCodigoQuery, [term]);
 
     if (exactCodeRows.length > 0) {
-      return [
+      return withPhaseCodes([
         {
           tipo: 'entrada',
           id: exactCodeRows[0].id_entrada,
           etiqueta: `Entrada #${exactCodeRows[0].id_entrada} - ${exactCodeRows[0].codigo_lote} - ${exactCodeRows[0].proveedor_nombre || 'Sin proveedor'}`,
         },
-      ];
+      ]);
+    }
+
+    // Codigo de fase (SUB-000009, sub9...): busca solo en esa fase, sin la ambiguedad de un
+    // numero suelto.
+    const phaseCode = parsePhaseCode(term);
+
+    if (phaseCode) {
+      // Se busca por el codigo GUARDADO (codigo_trazabilidad), normalizado a su forma canonica
+      // (sub9 -> SUB-000009). La entrada no tiene esa columna: ENT-NNNNNN es alias de su ID.
+      const canonicalCode = formatPhaseCode(phaseCode.tipo, phaseCode.id);
+      const id =
+        phaseCode.tipo === 'entrada' ? phaseCode.id : await findIdByPhaseCode(pool, phaseCode.tipo, canonicalCode);
+
+      return id === null ? [] : withPhaseCodes(await findSearchResultsById(phaseCode.tipo, id));
+    }
+
+    // Numero suelto: puede ser el ID de cualquier fase, se devuelven todas las coincidencias.
+    if (/^\d+$/.test(term)) {
+      const numericId = Number(term);
+      const resultsByType = await Promise.all(
+        SEARCHABLE_BY_ID_TYPES.map((tipo) => findSearchResultsById(tipo, numericId))
+      );
+      return withPhaseCodes(resultsByType.flat());
     }
 
     const results = [];
-    const isNumeric = /^\d+$/.test(term);
-
-    if (isNumeric) {
-      const numericId = Number(term);
-
-      const [entradaRows] = await pool.query(entradaQuery, [numericId]);
-      entradaRows.forEach((row) =>
-        results.push({
-          tipo: 'entrada',
-          id: row.id_entrada,
-          etiqueta: `Entrada #${row.id_entrada} - ${row.codigo_lote || 'sin codigo'} - ${row.proveedor_nombre || 'Sin proveedor'}`,
-        })
-      );
-
-      const [loteRows] = await pool.query(
-        `SELECT id_lote_mp, id_producto FROM ${RAW_MATERIAL_LOTS_TABLE} WHERE id_lote_mp = ?`,
-        [numericId]
-      );
-      loteRows.forEach((row) => results.push({ tipo: 'lote', id: row.id_lote_mp, etiqueta: `Lote MP #${row.id_lote_mp}` }));
-
-      const [subloteRows] = await pool.query(
-        `SELECT id_sublote, codigo_sublote FROM ${MATURATION_SUBLOT_TABLE} WHERE id_sublote = ?`,
-        [numericId]
-      );
-      subloteRows.forEach((row) =>
-        results.push({ tipo: 'sublote', id: row.id_sublote, etiqueta: `Sub-lote #${row.id_sublote} (${row.codigo_sublote})` })
-      );
-
-      const [procesoRows] = await pool.query(`SELECT id_proceso FROM ${PRODUCTION_TABLE} WHERE id_proceso = ?`, [numericId]);
-      procesoRows.forEach((row) => results.push({ tipo: 'proceso', id: row.id_proceso, etiqueta: `Proceso de produccion #${row.id_proceso}` }));
-
-      const [redRows] = await pool.query(`SELECT id_red FROM ${GREEN_NET_TABLE} WHERE id_red = ?`, [numericId]);
-      redRows.forEach((row) => results.push({ tipo: 'red', id: row.id_red, etiqueta: `Red verde #${row.id_red}` }));
-
-      const [existenciaRows] = await pool.query(`SELECT id_existencia FROM ${INVENTORY_TABLE} WHERE id_existencia = ?`, [numericId]);
-      existenciaRows.forEach((row) => results.push({ tipo: 'existencia', id: row.id_existencia, etiqueta: `Existencia #${row.id_existencia}` }));
-
-      return results;
-    }
-
     const likeTerm = `%${term}%`;
 
     const [entradaRows] = await pool.query(
@@ -523,7 +564,7 @@ const handlers = {
       results.push({ tipo: 'lote', id: row.id_lote_mp, etiqueta: `Lote MP #${row.id_lote_mp} - ${row.producto_nombre || ''}` })
     );
 
-    return results;
+    return withPhaseCodes(results);
   },
   'traceability.searchByFilters': async ({ areas, desde, hasta }) => {
     const requestedAreas = Array.isArray(areas) && areas.length > 0 ? areas : Object.keys(AREA_SEARCHERS);
@@ -537,7 +578,7 @@ const handlers = {
       requestedAreas.map(async (area) => AREA_SEARCHERS[area]({ desde: desde || null, hasta: hasta || null }))
     );
 
-    return resultsByArea.flat();
+    return withPhaseCodes(resultsByArea.flat());
   },
 };
 

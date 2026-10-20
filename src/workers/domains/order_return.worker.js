@@ -19,6 +19,7 @@ const {
   RETURN_REINGRESADO_STATE,
   RETURN_PERDIDA_STATE,
 } = require('../shared/constants');
+const { assignPhaseCode } = require('../shared/phaseCode');
 
 const RETURN_ELIGIBLE_STATES = new Set([PENDING_STATE, ORDER_DETAIL_PARCIAL_STATE, ORDER_DETAIL_RECHAZADO_STATE]);
 const { normalizeNullableText } = require('../shared/helpers');
@@ -165,6 +166,7 @@ const handlers = {
             [idProducto, 0, ACTIVE_STATE, id_usuario_resolucion ?? null]
           );
           existenceId = existenceResult.insertId;
+          await assignPhaseCode(connection, 'existencia', existenceId);
 
           const [createdExistenciaRows] = await connection.query(
             `SELECT * FROM ${INVENTORY_TABLE} WHERE id_existencia = ?`,

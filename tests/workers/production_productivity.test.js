@@ -1,4 +1,5 @@
-const { pool, resetDatabase, seedBaseline } = require('../helpers/db');
+const { pool, resetDatabase, seedBaseline, getStoredPhaseCode } = require('../helpers/db');
+const { formatPhaseCode } = require('../../src/workers/shared/phaseCode');
 const { createReadySublot } = require('../helpers/fixtures');
 const { handlers } = require('../../src/workers/domains/production.worker.js');
 
@@ -93,6 +94,16 @@ describe('productionProcesses.reportProductividad', () => {
     expect(Number(row.total_kg_producido)).toBeCloseTo(50, 2);
     expect(Number(row.total_horas_persona)).toBeCloseTo(10, 2);
     expect(Number(row.kg_por_hora_persona)).toBeCloseTo(5, 2);
+
+    // El proceso (create) y la existencia de producto terminado (finalize) guardan su codigo.
+    expect(await getStoredPhaseCode('proceso', process.id_proceso)).toBe(formatPhaseCode('proceso', process.id_proceso));
+    const [existenciaRows] = await pool.query('SELECT id_existencia FROM inventario_existencias WHERE id_proceso_origen = ?', [
+      process.id_proceso,
+    ]);
+    expect(existenciaRows).toHaveLength(1);
+    expect(await getStoredPhaseCode('existencia', existenciaRows[0].id_existencia)).toBe(
+      formatPhaseCode('existencia', existenciaRows[0].id_existencia)
+    );
   });
 
   it('agrupa por producto sin desglosar por periodo cuando agrupacion="producto"', async () => {

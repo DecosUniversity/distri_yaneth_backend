@@ -8,6 +8,7 @@ const {
   RAW_MATERIAL_LOTS_TABLE,
   MATURATION_SUBLOT_TABLE,
   MATURATION_CONTROL_TABLE,
+  CAT_COLD_ROOM_TABLE,
   ACTIVE_STATE,
   INACTIVE_STATE,
   PENDING_STATE,
@@ -16,6 +17,7 @@ const {
   MATURE_RIPENESS_STATE,
   MATURATION_BRIX_THRESHOLD,
 } = require('../shared/constants');
+const { assignPhaseCode } = require('../shared/phaseCode');
 const { normalizeNullableText } = require('../shared/helpers');
 const { AUDIT_ACTION_CREATE, AUDIT_ACTION_UPDATE, AUDIT_ACTION_DELETE, recordAudit } = require('../shared/audit');
 
@@ -37,7 +39,7 @@ const maturationSublotQueries = {
   latestMeasuredWeight: `SELECT peso_medido_kg FROM ${MATURATION_CONTROL_TABLE} WHERE id_sublote = ? AND peso_medido_kg IS NOT NULL ORDER BY fecha_medicion DESC, id_control DESC LIMIT 1`,
 };
 
-const maturationControlBaseQuery = `SELECT c.id_control, c.id_sublote, c.fecha_medicion, c.grados_brix, c.peso_medido_kg, c.porcentaje_materia_seca, c.temperatura_cuarto, c.observaciones, c.fecha_modificacion, c.id_usuario_modificacion, um.nombre_completo AS usuario_modificacion_nombre, s.codigo_sublote, s.id_lote_mp, s.estado_maduracion, s.estado_registro AS sublote_estado_registro, l.id_producto, p.nombre AS producto_nombre, l.id_proveedor, pr.nombre_empresa AS proveedor_nombre FROM ${MATURATION_CONTROL_TABLE} c LEFT JOIN ${MATURATION_SUBLOT_TABLE} s ON s.id_sublote = c.id_sublote LEFT JOIN ${RAW_MATERIAL_LOTS_TABLE} l ON l.id_lote_mp = s.id_lote_mp LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = l.id_producto LEFT JOIN ${PROVIDERS_TABLE} pr ON pr.id_proveedor = l.id_proveedor LEFT JOIN ${USERS_TABLE} um ON um.id_usuario = c.id_usuario_modificacion`;
+const maturationControlBaseQuery = `SELECT c.id_control, c.id_sublote, c.fecha_medicion, c.grados_brix, c.peso_medido_kg, c.porcentaje_materia_seca, c.temperatura_cuarto, c.id_cuarto_frio, cf.nombre_cuarto AS cuarto_frio_nombre, c.observaciones, c.fecha_modificacion, c.id_usuario_modificacion, um.nombre_completo AS usuario_modificacion_nombre, s.codigo_sublote, s.id_lote_mp, s.estado_maduracion, s.estado_registro AS sublote_estado_registro, l.id_producto, p.nombre AS producto_nombre, l.id_proveedor, pr.nombre_empresa AS proveedor_nombre FROM ${MATURATION_CONTROL_TABLE} c LEFT JOIN ${MATURATION_SUBLOT_TABLE} s ON s.id_sublote = c.id_sublote LEFT JOIN ${RAW_MATERIAL_LOTS_TABLE} l ON l.id_lote_mp = s.id_lote_mp LEFT JOIN ${PRODUCTS_TABLE} p ON p.id_producto = l.id_producto LEFT JOIN ${PROVIDERS_TABLE} pr ON pr.id_proveedor = l.id_proveedor LEFT JOIN ${USERS_TABLE} um ON um.id_usuario = c.id_usuario_modificacion LEFT JOIN ${CAT_COLD_ROOM_TABLE} cf ON cf.id_cuarto_frio = c.id_cuarto_frio`;
 
 const maturationControlQueries = {
   findAll: `${maturationControlBaseQuery} ORDER BY c.fecha_medicion DESC, c.id_control DESC`,
@@ -141,6 +143,8 @@ const handlers = {
         id_usuario_modificacion ?? null,
       ]
     );
+
+    await assignPhaseCode(pool, 'lote', result.insertId);
 
     const [rows] = await pool.query(maturationLotQueries.findById, [result.insertId]);
     const created = rows[0] || null;
@@ -264,6 +268,8 @@ const handlers = {
           id_usuario_modificacion ?? null,
         ]
       );
+
+      await assignPhaseCode(connection, 'sublote', result.insertId);
 
       // El peso aceptado queda comprometido al sub-lote: se descuenta del stock general
       // de Materia Prima para no contarlo dos veces (ahi + en Fruta para produccion).
@@ -391,6 +397,8 @@ const handlers = {
         ]
       );
 
+      await assignPhaseCode(connection, 'sublote', result.insertId);
+
       const [splitRows] = await connection.query(
         `${maturationSublotBaseQuery} WHERE s.id_sublote IN (?, ?) ORDER BY s.id_sublote ASC`,
         [id, result.insertId]
@@ -458,6 +466,7 @@ const handlers = {
     peso_medido_kg,
     porcentaje_materia_seca,
     temperatura_cuarto,
+    id_cuarto_frio,
     observaciones,
     id_usuario_modificacion,
   }) => {
@@ -466,8 +475,23 @@ const handlers = {
     try {
       await connection.beginTransaction();
 
+      // El cuarto frio es opcional; si viene, debe existir y estar activo en el catalogo
+      // compartido con Produccion (cat_cuartos_frio).
+      const coldRoomId = id_cuarto_frio === undefined || id_cuarto_frio === null || id_cuarto_frio === '' ? null : Number(id_cuarto_frio);
+
+      if (coldRoomId !== null) {
+        const [coldRoomRows] = await connection.query(
+          `SELECT id_cuarto_frio FROM ${CAT_COLD_ROOM_TABLE} WHERE id_cuarto_frio = ? AND estado_registro = '${ACTIVE_STATE}'`,
+          [coldRoomId]
+        );
+
+        if (coldRoomRows.length === 0) {
+          throw new Error('El cuarto frio seleccionado no existe');
+        }
+      }
+
       const [result] = await connection.query(
-        `INSERT INTO ${MATURATION_CONTROL_TABLE} (id_sublote, grados_brix, peso_medido_kg, porcentaje_materia_seca, temperatura_cuarto, observaciones, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ${MATURATION_CONTROL_TABLE} (id_sublote, grados_brix, peso_medido_kg, porcentaje_materia_seca, temperatura_cuarto, id_cuarto_frio, observaciones, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id_sublote,
           Number(grados_brix),
@@ -480,6 +504,7 @@ const handlers = {
           temperatura_cuarto === undefined || temperatura_cuarto === null || temperatura_cuarto === ''
             ? null
             : Number(temperatura_cuarto),
+          coldRoomId,
           normalizeNullableText(observaciones),
           id_usuario_modificacion ?? null,
         ]

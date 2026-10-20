@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const productionController = require('../controllers/production.controller');
 const mermaTypeController = require('../controllers/merma_type.controller');
+const coldRoomTypeController = require('../controllers/cold_room_type.controller');
 const stageTypeController = require('../controllers/stage_type.controller');
 const productionOrderController = require('../controllers/production_order.controller');
 const productStageRequirementController = require('../controllers/product_stage_requirement.controller');
@@ -120,6 +121,124 @@ router.put('/tipos-merma/:id', mermaTypeController.updateMermaType);
  *         description: No encontrado
  */
 router.delete('/tipos-merma/:id', mermaTypeController.deleteMermaType);
+
+/**
+ * @swagger
+ * /api/produccion/cuartos-frio:
+ *   get:
+ *     summary: Lista el catalogo de cuartos frios activos
+ *     tags: [Produccion]
+ *     responses:
+ *       200:
+ *         description: Lista de cuartos frios
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/CuartoFrio'
+ */
+router.get('/cuartos-frio', coldRoomTypeController.getColdRoomTypes);
+
+/**
+ * @swagger
+ * /api/produccion/cuartos-frio/{id}:
+ *   get:
+ *     summary: Obtiene un cuarto frio del catalogo por id
+ *     tags: [Produccion]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Cuarto frio encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CuartoFrio'
+ *       404:
+ *         description: No encontrado
+ */
+router.get('/cuartos-frio/:id', coldRoomTypeController.getColdRoomTypeById);
+
+/**
+ * @swagger
+ * /api/produccion/cuartos-frio:
+ *   post:
+ *     summary: Crea un cuarto frio en el catalogo
+ *     tags: [Produccion]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [nombre_cuarto]
+ *             properties:
+ *               nombre_cuarto: { type: string }
+ *               descripcion: { type: string }
+ *     responses:
+ *       201:
+ *         description: Cuarto frio creado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CuartoFrio'
+ *       409:
+ *         description: Ya existe un cuarto frio con ese nombre
+ */
+router.post('/cuartos-frio', coldRoomTypeController.createColdRoomType);
+
+/**
+ * @swagger
+ * /api/produccion/cuartos-frio/{id}:
+ *   put:
+ *     summary: Actualiza un cuarto frio del catalogo
+ *     tags: [Produccion]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nombre_cuarto: { type: string }
+ *               descripcion: { type: string }
+ *     responses:
+ *       200:
+ *         description: Cuarto frio actualizado
+ *       404:
+ *         description: No encontrado
+ *       409:
+ *         description: Ya existe un cuarto frio con ese nombre
+ */
+router.put('/cuartos-frio/:id', coldRoomTypeController.updateColdRoomType);
+
+/**
+ * @swagger
+ * /api/produccion/cuartos-frio/{id}:
+ *   delete:
+ *     summary: Desactiva (soft-delete) un cuarto frio del catalogo
+ *     tags: [Produccion]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       204:
+ *         description: Desactivado
+ *       404:
+ *         description: No encontrado
+ */
+router.delete('/cuartos-frio/:id', coldRoomTypeController.deleteColdRoomType);
 
 /**
  * @swagger
@@ -646,10 +765,10 @@ router.post('/procesos/:id/insumos', productionController.addInsumo);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [fecha_ingreso]
+ *             required: [fecha_ingreso, id_cuarto_frio, cantidad_kg]
  *             properties:
  *               fecha_ingreso: { type: string, format: date-time }
- *               ubicacion_cuarto: { type: string }
+ *               id_cuarto_frio: { type: integer, description: 'Debe existir en el catalogo /api/produccion/cuartos-frio.' }
  *               cantidad_kg: { type: number }
  *               observaciones: { type: string }
  *     responses:
