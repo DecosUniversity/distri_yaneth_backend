@@ -102,6 +102,43 @@ describe('BUG-CLI-01 (TC-REQ001-005): NIT duplicado en clientes', () => {
   });
 });
 
+describe('CU001 (misma regla que BUG-CLI-01): NIT duplicado en proveedores', () => {
+  const provider = (nombre, nit) => ({ nombre_empresa: nombre, nit });
+
+  it('rechaza con 409 un segundo proveedor activo con el NIT de otro (seedBaseline ya tiene CF-1)', async () => {
+    const duplicate = await request(app).post('/api/proveedores').set('Authorization', authHeader).send(provider('Finca Duplicada', ' cf-1 '));
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body.message).toMatch(/NIT/);
+
+    const [rows] = await pool.query("SELECT COUNT(*) AS total FROM proveedores WHERE UPPER(TRIM(nit)) = 'CF-1'");
+    expect(rows[0].total).toBe(1);
+  });
+
+  it('permite editar un proveedor conservando su propio NIT, pero no tomar el de otro', async () => {
+    const other = await request(app).post('/api/proveedores').set('Authorization', authHeader).send(provider('Finca Nueva', '7654321-0'));
+    expect(other.status).toBe(201);
+
+    const steal = await request(app)
+      .put(`/api/proveedores/${other.body.id_proveedor}`)
+      .set('Authorization', authHeader)
+      .send(provider('Finca Nueva', 'CF-1'));
+    expect(steal.status).toBe(409);
+
+    const keep = await request(app)
+      .put(`/api/proveedores/${other.body.id_proveedor}`)
+      .set('Authorization', authHeader)
+      .send(provider('Finca Nueva renombrada', '7654321-0'));
+    expect(keep.status).toBe(200);
+  });
+
+  it('permite proveedores sin NIT', async () => {
+    const a = await request(app).post('/api/proveedores').set('Authorization', authHeader).send(provider('Sin NIT A', ''));
+    const b = await request(app).post('/api/proveedores').set('Authorization', authHeader).send(provider('Sin NIT B', ''));
+    expect(a.status).toBe(201);
+    expect(b.status).toBe(201);
+  });
+});
+
 describe('BUG-REC-01 (TC-REQ002-002): peso de unidad negativo en recepcion', () => {
   const createEntry = (unidades) =>
     request(app)

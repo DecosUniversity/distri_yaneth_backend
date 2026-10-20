@@ -1,6 +1,22 @@
 const providerModel = require('../models/provider.model');
 
 const parseId = (value) => Number.parseInt(value, 10);
+// Misma regla que en clientes: el NIT es opcional, pero no puede repetirse entre proveedores
+// activos (excepcion de CU001). Se compara sin espacios ni distincion de mayusculas.
+const nitKey = (value) => (typeof value === 'string' ? value.replace(/\s+/g, '').toUpperCase() : '');
+const DUPLICATED_NIT_MESSAGE = 'Ya existe un proveedor activo con ese NIT';
+const normalizeText = (value) => (typeof value === 'string' ? value.trim() : value);
+
+const findActiveProviderWithNit = async (nit, excludeId = null) => {
+  const key = nitKey(nit);
+
+  if (!key) {
+    return null;
+  }
+
+  const providers = await providerModel.findAll();
+  return providers.find((provider) => nitKey(provider.nit) === key && provider.id_proveedor !== excludeId) || null;
+};
 
 const getProviders = async (_req, res, next) => {
   try {
@@ -39,9 +55,13 @@ const createProvider = async (req, res, next) => {
       return res.status(400).json({ message: 'nombre_empresa es obligatorio' });
     }
 
+    if (await findActiveProviderWithNit(nit)) {
+      return res.status(409).json({ message: DUPLICATED_NIT_MESSAGE });
+    }
+
     const newProvider = await providerModel.create({
       nombre_empresa,
-      nit,
+      nit: normalizeText(nit),
       contacto_nombre,
       telefono,
       id_usuario_modificacion: req.auth?.sub ?? null,
@@ -67,9 +87,13 @@ const updateProvider = async (req, res, next) => {
       return res.status(400).json({ message: 'nombre_empresa es obligatorio' });
     }
 
+    if (await findActiveProviderWithNit(nit, id)) {
+      return res.status(409).json({ message: DUPLICATED_NIT_MESSAGE });
+    }
+
     const updatedProvider = await providerModel.update(id, {
       nombre_empresa,
-      nit,
+      nit: normalizeText(nit),
       contacto_nombre,
       telefono,
       id_usuario_modificacion: req.auth?.sub ?? null,
