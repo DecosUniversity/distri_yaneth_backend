@@ -75,6 +75,11 @@ const getFilteredSearch = async (req, res, next) => {
       return res.status(400).json({ message: 'hasta debe tener formato YYYY-MM-DD' });
     }
 
+    // YYYY-MM-DD se compara correctamente como texto
+    if (desde && hasta && desde > hasta) {
+      return res.status(400).json({ message: 'La fecha "desde" no puede ser posterior a "hasta"' });
+    }
+
     const results = await traceabilityModel.searchByFilters({ areas: areaList, desde, hasta });
     return res.status(200).json(results);
   } catch (error) {

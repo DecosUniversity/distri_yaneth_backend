@@ -43,6 +43,8 @@ const handleProductionError = (error, res, next) => {
     BUSINESS_RULE_MESSAGES.includes(error.message) ||
     error.message.startsWith('El peso no cuadra') ||
     error.message.startsWith('Faltan etapas requeridas') ||
+    error.message.startsWith('La merma supera') ||
+    error.message.startsWith('La entrada de la etapa no puede ser menor') ||
     error.message.startsWith('Debes registrar primero')
   ) {
     return res.status(400).json({ message: error.message });
@@ -474,7 +476,7 @@ const addMerma = async (req, res, next) => {
 
     return res.status(201).json(merma);
   } catch (error) {
-    return next(error);
+    return handleProductionError(error, res, next);
   }
 };
 

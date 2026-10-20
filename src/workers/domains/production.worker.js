@@ -157,6 +157,10 @@ const replacePackingDetailForStage = async (connection, idEtapa, cajas, userId) 
   }
 };
 
+// Una justificacion compuesta solo por espacios equivale a no justificar (no basta con que el
+// formulario web haga trim: la regla tiene que valer tambien para quien consume la API).
+const normalizeJustification = (value) => normalizeNullableText(typeof value === 'string' ? value.trim() : value);
+
 const recomputeStageMermaAndSalida = async (connection, idEtapa, userId) => {
   if (idEtapa === null || idEtapa === undefined || idEtapa === '') {
     return;
@@ -517,6 +521,22 @@ const handlers = {
       );
       await assertStageBelongsToProductPlan(connection, processRows[0]?.id_producto_resultado, id_tipo_etapa);
 
+      // Bajar la entrada de la etapa no puede dejar sus mermas ya registradas por encima de ella.
+      if (cantidad_entrada_kg !== null && cantidad_entrada_kg !== undefined) {
+        const [stageMermaRows] = await connection.query(
+          `SELECT COALESCE(SUM(cantidad_kg), 0) AS total FROM ${PRODUCTION_MERMA_TABLE} WHERE id_etapa = ? AND estado_registro = '${ACTIVE_STATE}'`,
+          [id_etapa]
+        );
+        const stageMermaKg = Number(stageMermaRows[0]?.total || 0);
+
+        if (Number(stageMermaKg.toFixed(2)) > Number(cantidad_entrada_kg)) {
+          await connection.rollback();
+          throw new Error(
+            `La entrada de la etapa no puede ser menor que sus mermas registradas (${stageMermaKg.toFixed(2)} kg)`
+          );
+        }
+      }
+
       const [result] = await connection.query(
         `UPDATE ${PRODUCTION_STAGE_TABLE} SET id_tipo_etapa = ?, cantidad_personas = ?, personal_asignado = ?, fecha_inicio = ?, fecha_fin = ?, cantidad_entrada_kg = ?, observaciones = ?, id_usuario_modificacion = ? WHERE id_etapa = ? AND id_proceso = ? AND estado_registro = '${ACTIVE_STATE}'`,
         [
@@ -576,6 +596,47 @@ const handlers = {
       if (processRows.length === 0 || processRows[0].estado_proceso === PRODUCTION_FINISHED_STATE) {
         await connection.rollback();
         return null;
+      }
+
+      // Una merma no puede superar el peso que realmente entro: ni el de su etapa (se valida primero,
+      // por ser el mensaje mas especifico) ni el del proceso completo.
+      const newMermaKg = Number(cantidad_kg);
+
+      if (id_etapa !== null && id_etapa !== undefined) {
+        const [stageRows] = await connection.query(
+          `SELECT cantidad_entrada_kg FROM ${PRODUCTION_STAGE_TABLE} WHERE id_etapa = ? AND id_proceso = ? AND estado_registro = '${ACTIVE_STATE}'`,
+          [id_etapa, id]
+        );
+        const stageInput = stageRows[0]?.cantidad_entrada_kg;
+
+        if (stageInput !== null && stageInput !== undefined) {
+          const [stageMermaRows] = await connection.query(
+            `SELECT COALESCE(SUM(cantidad_kg), 0) AS total FROM ${PRODUCTION_MERMA_TABLE} WHERE id_etapa = ? AND estado_registro = '${ACTIVE_STATE}'`,
+            [id_etapa]
+          );
+          const stageMermaAfterKg = Number(stageMermaRows[0]?.total || 0) + newMermaKg;
+
+          if (Number(stageMermaAfterKg.toFixed(2)) > Number(stageInput)) {
+            await connection.rollback();
+            throw new Error(
+              `La merma supera la entrada de la etapa: mermas acumuladas ${stageMermaAfterKg.toFixed(2)} kg > entrada ${Number(stageInput).toFixed(2)} kg`
+            );
+          }
+        }
+      }
+
+      const [processMermaRows] = await connection.query(
+        `SELECT COALESCE(SUM(cantidad_kg), 0) AS total FROM ${PRODUCTION_MERMA_TABLE} WHERE id_proceso = ? AND estado_registro = '${ACTIVE_STATE}'`,
+        [id]
+      );
+      const processInputKg = Number(processRows[0].cantidad_ingresada_kg);
+      const processMermaAfterKg = Number(processMermaRows[0]?.total || 0) + newMermaKg;
+
+      if (Number(processMermaAfterKg.toFixed(2)) > processInputKg) {
+        await connection.rollback();
+        throw new Error(
+          `La merma supera el peso ingresado al proceso: mermas acumuladas ${processMermaAfterKg.toFixed(2)} kg > ingresado ${processInputKg.toFixed(2)} kg`
+        );
       }
 
       const [result] = await connection.query(
@@ -778,7 +839,7 @@ const handlers = {
       const totalMermaKg = Number(mermaTotalRows[0]?.total || 0);
       const expectedOutputKg = inputKg - totalMermaKg;
       const differenceKg = Number((expectedOutputKg - outputKg).toFixed(2));
-      const justification = normalizeNullableText(justificacion_diferencia);
+      const justification = normalizeJustification(justificacion_diferencia);
 
       if (Math.abs(differenceKg) > BALANCE_TOLERANCE_KG && !justification) {
         await connection.rollback();
@@ -1059,7 +1120,7 @@ const handlers = {
           );
         }
 
-        justification = normalizeNullableText(justificacion_reversion);
+        justification = normalizeJustification(justificacion_reversion);
 
         if (!justification) {
           await connection.rollback();

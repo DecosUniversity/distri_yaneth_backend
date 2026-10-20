@@ -32,6 +32,11 @@ const parseReportFilters = (query) => {
     return { error: 'hasta debe tener formato YYYY-MM-DD' };
   }
 
+  // YYYY-MM-DD se compara correctamente como texto
+  if (desde && hasta && desde > hasta) {
+    return { error: 'La fecha "desde" no puede ser posterior a "hasta"' };
+  }
+
   let parsedClientId = null;
 
   if (id_cliente) {

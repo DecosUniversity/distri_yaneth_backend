@@ -2,6 +2,21 @@ const clientModel = require('../models/client.model');
 
 const parseId = (value) => Number.parseInt(value, 10);
 const normalizeRequiredText = (value) => (typeof value === 'string' ? value.trim() : value);
+// Clave de comparacion del NIT: ignora espacios y mayusculas/minusculas ("1234567-8" == " 1234567-8 ")
+const nitKey = (value) => (typeof value === 'string' ? value.replace(/\s+/g, '').toUpperCase() : '');
+const DUPLICATED_NIT_MESSAGE = 'Ya existe un cliente activo con ese NIT';
+
+// El NIT es opcional, pero si viene no puede repetirse entre clientes activos (excepcion de CU001).
+const findActiveClientWithNit = async (nit, excludeId = null) => {
+  const key = nitKey(nit);
+
+  if (!key) {
+    return null;
+  }
+
+  const clients = await clientModel.findAll();
+  return clients.find((client) => nitKey(client.nit_facturacion) === key && client.id_cliente !== excludeId) || null;
+};
 
 const getClients = async (_req, res, next) => {
   try {
@@ -41,6 +56,10 @@ const createClient = async (req, res, next) => {
       return res.status(400).json({ message: 'nombre_comercial es obligatorio' });
     }
 
+    if (await findActiveClientWithNit(nit_facturacion)) {
+      return res.status(409).json({ message: DUPLICATED_NIT_MESSAGE });
+    }
+
     const newClient = await clientModel.create({
       nombre_comercial: normalizedNombreComercial,
       departamento,
@@ -48,7 +67,7 @@ const createClient = async (req, res, next) => {
       zona,
       direccion_entrega,
       telefono,
-      nit_facturacion,
+      nit_facturacion: normalizeRequiredText(nit_facturacion),
       id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
@@ -73,6 +92,10 @@ const updateClient = async (req, res, next) => {
       return res.status(400).json({ message: 'nombre_comercial es obligatorio' });
     }
 
+    if (await findActiveClientWithNit(nit_facturacion, id)) {
+      return res.status(409).json({ message: DUPLICATED_NIT_MESSAGE });
+    }
+
     const updatedClient = await clientModel.update(id, {
       nombre_comercial: normalizedNombreComercial,
       departamento,
@@ -80,7 +103,7 @@ const updateClient = async (req, res, next) => {
       zona,
       direccion_entrega,
       telefono,
-      nit_facturacion,
+      nit_facturacion: normalizeRequiredText(nit_facturacion),
       id_usuario_modificacion: req.auth?.sub ?? null,
     });
 

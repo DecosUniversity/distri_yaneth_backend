@@ -101,6 +101,18 @@ const createEntradaMercancia = async (req, res, next) => {
       return res.status(400).json({ message: 'cantidad_disponible debe ser mayor a 0' });
     }
 
+    if (unidades !== undefined && unidades !== null) {
+      if (!Array.isArray(unidades)) {
+        return res.status(400).json({ message: 'unidades debe ser un arreglo' });
+      }
+
+      const invalidUnit = unidades.find((unit) => !unit || !(Number(unit.peso) > 0));
+
+      if (invalidUnit) {
+        return res.status(400).json({ message: 'Cada unidad debe tener un peso mayor a 0' });
+      }
+    }
+
     if (parsedCostoUnitario !== null && (Number.isNaN(parsedCostoUnitario) || parsedCostoUnitario < 0)) {
       return res.status(400).json({ message: 'costo_unitario debe ser mayor o igual a 0' });
     }
@@ -171,8 +183,12 @@ const createUnitForEntrada = async (req, res, next) => {
     const { unidad_codigo, peso, fecha_pesos } = req.body;
     const creado_por = req.auth?.sub;
 
-    if (peso === undefined || peso === null || Number.isNaN(Number(peso))) {
+    if (peso === undefined || peso === null || peso === '' || Number.isNaN(Number(peso))) {
       return res.status(400).json({ message: 'peso es obligatorio y debe ser numerico' });
+    }
+
+    if (Number(peso) <= 0) {
+      return res.status(400).json({ message: 'peso debe ser mayor a 0' });
     }
 
     const unit = await require('../models/entrada_unidades.model').create({
