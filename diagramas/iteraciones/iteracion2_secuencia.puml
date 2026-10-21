@@ -16,7 +16,7 @@ skinparam databaseBackgroundColor #FFFFFF
 skinparam queueBorderColor #4D4D4D
 skinparam queueBackgroundColor #FFFFFF
 
-actor "Operador de Planta" as Op
+actor "Producción" as Op
 participant "Cliente Web" as CW
 participant "API REST" as API
 queue "Cola de Trabajos\n(BullMQ / Redis)" as Q
@@ -25,10 +25,10 @@ database "Base de Datos\n(MySQL)" as DB
 
 Op -> CW : Registra entrada de lote y pesaje por cajas
 CW -> API : Envía datos del lote
-API -> DB : Guarda lote (estado "En Espera")
-API -> Q : Encola cálculo de peso neto (bruto - tara)
+API -> DB : Guarda la entrada y el lote (estado "Pendiente")
+API -> Q : Encola el cálculo del peso total (suma de cajas)
 Q -> W : Procesa la tarea
-W -> DB : Registra peso neto y pasa el lote a maduración ("En Proceso")
+W -> DB : Al aceptar el lote, crea el sub-lote en maduración ("Activo")
 
 loop Muestreo periódico de maduración
   Op -> CW : Ingresa mediciones de laboratorio (Brix / Materia Seca)
@@ -36,9 +36,9 @@ loop Muestreo periódico de maduración
   API -> DB : Actualiza métricas y evalúa el umbral técnico
 end
 
-API --> CW : Marca sub-lote "Listo para Proceso" y muestra alerta en el dashboard
-Op -> CW : Autoriza el traslado al módulo de producción
-CW -> API : Confirma la autorización
-API -> DB : Registra peso neto disponible y estado "Procesado"
+API --> CW : Marca el sub-lote "Listo para producción" y lo muestra en el dashboard
+Op -> CW : Inicia un proceso de producción con el sub-lote
+CW -> API : Envía el proceso de producción
+API -> DB : Descuenta el peso del sub-lote ("Enviado a producción" al agotarse)
 
 @enduml

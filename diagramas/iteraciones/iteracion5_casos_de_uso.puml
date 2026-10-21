@@ -18,12 +18,12 @@ skinparam rectangle {
   BackgroundColor #FFFFFF
 }
 
-actor "Gerencia" as G
+actor "Administrador" as G
 
 rectangle "**//Módulo de Reportería y Dashboard de Rendimiento//**" {
   usecase "Visualizar Dashboard de Indicadores\n(producción, mermas, ventas)" as UC_Dash
-  usecase "Aplicar Filtros de Análisis\n(fecha, cliente, tipo de merma)" as UC_Filtros
-  usecase "Generar Reporte Detallado\n(inventario valorizado, trazabilidad de lote,\neficiencia de flota)" as UC_Rep
+  usecase "Aplicar Filtros de Análisis\n(rango de fechas, cliente)" as UC_Filtros
+  usecase "Generar Reporte Detallado\n(pedidos, inventario, producción,\nmermas, trazabilidad de lote)" as UC_Rep
   usecase "Exportar Información (PDF / Excel)" as UC_Exp
 }
 

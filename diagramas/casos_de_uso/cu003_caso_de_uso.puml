@@ -9,7 +9,7 @@ skinparam usecase {
 }
 top to bottom direction
 
-actor "Operador de Planta" as Operador
+actor "Producción" as Operador
 actor "Administrador" as Admin
 
 rectangle "Control de Producción y Rendimiento" {
@@ -36,7 +36,7 @@ UC_Cat ..> UC_Etapa : <<extend>>
 UC_Red ..> UC_Iniciar : <<extend>>
 
 note right of UC_Cat
-  Las etapas base (Pelado, Corte, Fritura, Empaque)
+  Las etapas base (Pelado, Corte, Fritura, Embalaje)
   y los tipos de merma son catálogos extensibles.
 end note
 

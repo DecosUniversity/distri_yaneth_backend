@@ -16,27 +16,27 @@ skinparam databaseBackgroundColor #FFFFFF
 skinparam queueBorderColor #4D4D4D
 skinparam queueBackgroundColor #FFFFFF
 
-actor "Gerencia" as G
+actor "Administrador" as G
 participant "Cliente Web" as CW
 participant "API REST" as API
 queue "Cola de Trabajos\n(BullMQ / Redis)" as Q
 participant "Worker" as W
 database "Base de Datos\n(MySQL)" as DB
 
-G -> CW : Abre el dashboard y aplica filtros (fecha, cliente, tipo de merma)
+G -> CW : Abre el dashboard y aplica filtros (fecha, cliente)
 CW -> API : Solicita indicadores filtrados
 API -> DB : Consulta producción, mermas y logística
 DB --> API : Resultados
 API --> CW : Actualiza las gráficas en pantalla
 
-G -> CW : Solicita reporte detallado\n(inventario valorizado, trazabilidad de lote o eficiencia de flota)
+G -> CW : Solicita reporte detallado\n(pedidos, inventario, producción o trazabilidad de lote)
 CW -> API : Solicita la generación del reporte
 API -> Q : Encola el cálculo del reporte
 Q -> W : Procesa la tarea
-W -> DB : Calcula costos y consolida los datos
+W -> DB : Consolida los datos del reporte
 W --> API : Reporte listo
 
-alt La gerencia exporta el reporte
+alt El administrador exporta el reporte (PDF / Excel)
   G -> CW : Exporta a PDF / Excel
   CW --> G : Entrega el archivo generado
 end

@@ -10,7 +10,7 @@ skinparam usecase {
 top to bottom direction
 
 actor "Administrador" as Admin
-actor "Operador de Planta" as Operador
+actor "Producción" as Operador
 
 rectangle "Recepción y Control de Maduración" {
   usecase "Registrar Entrada de Lote" as UC_Entrada

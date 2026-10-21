@@ -16,18 +16,18 @@ skinparam databaseBackgroundColor #FFFFFF
 skinparam queueBorderColor #4D4D4D
 skinparam queueBackgroundColor #FFFFFF
 
-actor "Operador de Producción" as Op
+actor "Producción" as Op
 participant "Cliente Web" as CW
 participant "API REST" as API
 queue "Cola de Trabajos\n(BullMQ / Redis)" as Q
 participant "Worker" as W
 database "Base de Datos\n(MySQL)" as DB
 
-Op -> CW : Selecciona sub-lote "Listo para Proceso"
+Op -> CW : Selecciona sub-lote "Listo para producción"
 CW -> API : Inicia la producción del sub-lote
 API -> DB : Crea el registro de producción
 
-loop Por cada etapa (Pelado, Corte, Fritura, Empaque)
+loop Por cada etapa (Pelado, Corte, Fritura, Embalaje)
   Op -> CW : Registra tiempos, personal y mermas de la etapa
   CW -> API : Envía datos de la etapa
   API -> Q : Encola el guardado

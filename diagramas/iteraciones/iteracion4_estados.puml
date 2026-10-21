@@ -14,25 +14,28 @@ state "Pendiente" as Pendiente
 state "Preparado" as Preparado
 state "En Ruta" as EnRuta
 state "Entregado" as Entregado
-state "Devuelto" as Devuelto
+state "Con Devolución" as ConDevolucion
+state "Cancelado" as Cancelado
 state "Reingresado a Inventario" as Reingreso
 state "Pérdida" as Perdida
 
 Pendiente --> Preparado : Ruta asignada y\nmanifiesto generado
+Pendiente --> Cancelado : Pedido cancelado
 Preparado --> EnRuta : Piloto registra\nkilometraje de salida
-EnRuta --> Entregado : Piloto confirma la entrega
-EnRuta --> Devuelto : Cliente rechaza la mercadería\n(registra motivo)
-Entregado --> Devuelto : Devolución posterior\n(registra motivo)
-Devuelto --> Reingreso : Recepción en bodega +\nresolución: producto reutilizable
-Devuelto --> Perdida : Recepción en bodega +\nresolución: producto no reutilizable
+EnRuta --> Entregado : Al cerrar la ruta, todas\nlas líneas fueron entregadas
+EnRuta --> ConDevolucion : Al cerrar la ruta, alguna línea quedó\nparcial o rechazada (registra motivo)
+ConDevolucion --> Reingreso : Recepción en bodega +\nresolución: producto reutilizable
+ConDevolucion --> Perdida : Recepción en bodega +\nresolución: producto no reutilizable
 Entregado --> [*]
+Cancelado --> [*]
 Reingreso --> [*]
 Perdida --> [*]
 
-note bottom of Devuelto
-  La devolución se procesa en dos pasos:
+note bottom of ConDevolucion
+  La devolución se procesa por línea en dos pasos:
   1) recepción física en bodega
-  2) resolución (reingreso a inventario o pérdida).
+  2) resolución (reingreso a inventario o pérdida);
+  la línea queda en estado "Devuelto".
 end note
 
 @enduml

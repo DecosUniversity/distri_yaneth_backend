@@ -8,23 +8,22 @@ skinparam state {
   FontColor #000000
 }
 
-[*] --> EnEspera
+[*] --> Pendiente
 
-state "En Espera" as EnEspera
-state "En Proceso\n(maduración)" as EnProceso
-state "Listo para Proceso" as Listo
-state "Procesado" as Procesado
-state "Rechazado" as Rechazado
+state "Pendiente\n(lote por aceptar)" as Pendiente
+state "Activo\n(sub-lote en maduración)" as EnProceso
+state "Listo para producción" as Listo
+state "Enviado a producción" as Enviado
 
-EnEspera --> EnProceso : Registro de pesaje\ny peso neto completo
+Pendiente --> EnProceso : Se acepta el lote y se crea el\nsub-lote con su estado de madurez
+Pendiente --> Listo : Lote aceptado como "Maduro"
 EnProceso --> EnProceso : Muestreo periódico\n(Brix / Materia Seca)
-EnProceso --> Listo : Sub-lote alcanza el\numbral técnico de maduración
-EnProceso --> Rechazado : Métricas fuera de rango\n(inmadura o sobremadura)
-Listo --> Procesado : Administrador autoriza el\ntraslado al módulo de producción
-Procesado --> [*]
-Rechazado --> [*]
+EnProceso --> Listo : El sub-lote alcanza el\numbral técnico de Grados Brix
+EnProceso --> Enviado : Sub-lote verde empacado en red\n(proceso de producción)
+Listo --> Enviado : Su peso se consume en\nprocesos de producción
+Enviado --> [*]
 
-note right of EnProceso
+note left of EnProceso
   Un mismo lote puede fraccionarse en sub-lotes
   (verde, sarazo, maduro, sobremaduro); cada
   sub-lote avanza de estado de forma independiente.

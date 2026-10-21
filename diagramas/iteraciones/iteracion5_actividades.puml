@@ -14,14 +14,14 @@ skinparam activity {
 
 start
 :Abrir el dashboard de indicadores;
-:Aplicar filtros (fecha, cliente, tipo de merma);
+:Aplicar filtros (fecha, cliente);
 :Revisar indicadores de producción, mermas y ventas;
 
 if (¿Requiere un análisis con mayor detalle?) then (no)
   stop
 else (sí)
-  :Elegir el reporte\n(inventario valorizado / trazabilidad de lote / eficiencia de flota);
-  :Generar el reporte detallado\n(cálculo de costos y consolidación de datos);
+  :Elegir el reporte\n(pedidos / inventario / producción / trazabilidad de lote);
+  :Generar el reporte detallado\n(consolidación de los datos);
   if (¿Exportar la información?) then (sí)
     :Descargar en PDF / Excel;
   else (no)

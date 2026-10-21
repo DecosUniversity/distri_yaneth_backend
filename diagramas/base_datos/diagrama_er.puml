@@ -1,5 +1,5 @@
 @startuml diagrama_er
-' Diagrama Entidad-Relación (actualizado desde sql/schema.sql, 2026-09-08)
+' Diagrama Entidad-Relación (actualizado desde sql/schema.sql, 2026-10-20)
 ' Nota: se omiten los campos de auditoría repetidos en casi todas las tablas
 ' (estado_registro, fecha_creacion, fecha_modificacion, id_usuario_modificacion)
 ' y las relaciones de auditoría hacia "usuarios" (quién creó/modificó el registro),
@@ -84,6 +84,7 @@ package "Recepción y Maduración" {
   entity "lotes_materia_prima" as lotes_materia_prima {
     * id_lote_mp
     --
+    codigo_trazabilidad
     + id_producto
     + id_proveedor
     + id_entrada_origen
@@ -93,6 +94,7 @@ package "Recepción y Maduración" {
   entity "sublotes_maduracion" as sublotes_maduracion {
     * id_sublote
     --
+    codigo_trazabilidad
     + id_lote_mp
     codigo_sublote
     peso_kg
@@ -103,6 +105,7 @@ package "Recepción y Maduración" {
     * id_control
     --
     + id_sublote
+    + id_cuarto_frio
     grados_brix
     porcentaje_materia_seca
   }
@@ -119,6 +122,7 @@ package "Producción" {
   entity "procesos_produccion" as procesos_produccion {
     * id_proceso
     --
+    codigo_trazabilidad
     + id_sublote
     + id_producto_resultado
     + id_orden
@@ -151,6 +155,11 @@ package "Producción" {
     --
     nombre_merma
   }
+  entity "cat_cuartos_frio" as cat_cuartos_frio {
+    * id_cuarto_frio
+    --
+    nombre_cuarto
+  }
   entity "produccion_mermas" as produccion_mermas {
     * id_merma
     --
@@ -171,6 +180,7 @@ package "Producción" {
     * id_ingreso_cuarto
     --
     + id_proceso
+    + id_cuarto_frio
     ubicacion_cuarto
     cantidad_kg
   }
@@ -184,6 +194,7 @@ package "Producción" {
   entity "redes_verde_detalle" as redes_verde_detalle {
     * id_red
     --
+    codigo_trazabilidad
     + id_sublote
     + id_existencia
     peso_kg
@@ -195,6 +206,7 @@ package "Inventario y Ventas" {
   entity "inventario_existencias" as inventario_existencias {
     * id_existencia
     --
+    codigo_trazabilidad
     + id_producto
     + id_proveedor
     + id_proceso_origen
@@ -212,6 +224,7 @@ package "Inventario y Ventas" {
   entity "pedidos" as pedidos {
     * id_pedido
     --
+    codigo_trazabilidad
     + id_cliente
     estado
     fecha_entrega_programada
@@ -313,6 +326,8 @@ procesos_produccion ||--o{ produccion_etapas
 procesos_produccion ||--o{ produccion_insumos
 procesos_produccion ||--o{ produccion_mermas
 procesos_produccion ||--o{ produccion_cuartos_frio
+cat_cuartos_frio |o--o{ produccion_cuartos_frio
+cat_cuartos_frio |o--o{ control_maduracion
 procesos_produccion |o--o{ inventario_existencias : origen
 
 cat_tipos_etapa ||--o{ produccion_etapas

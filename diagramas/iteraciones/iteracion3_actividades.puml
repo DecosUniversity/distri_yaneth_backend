@@ -13,14 +13,14 @@ skinparam activity {
 }
 
 start
-:Recibir sub-lote "Listo para Proceso";
+:Recibir sub-lote "Listo para producción";
 
 if (Estado del sub-lote) then (verde)
   :Empacar "Plátano verde en red"\n(registrar peso por unidad empacada);
 elseif (sarazo / maduro) then
   repeat
-    :Registrar etapa (Pelado, Corte, Fritura, Empaque)\ncon tiempos y personal asignado;
-    :Declarar mermas por etapa\n(catálogo dinámico de tipos de merma);
+    :Registrar etapa del plan del producto\n(Pelado, Corte, Fritura, Embalaje)\ncon tiempos y personal asignado;
+    :Declarar mermas por etapa\n(catálogo dinámico; nunca mayores\nque la entrada de la etapa);
     :Registrar consumo de insumos\n(aceite, bolsas de empaque y de basura);
   repeat while (¿Quedan etapas?) is (sí)
   :Calcular rendimiento neto y balance de masa\n(ingresado vs. producido vs. mermas);

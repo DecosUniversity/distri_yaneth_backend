@@ -18,13 +18,13 @@ skinparam rectangle {
   BackgroundColor #FFFFFF
 }
 
-actor "Operador de Planta" as Op
+actor "Producción" as Op
 actor "Administrador" as A
 
 rectangle "**//Módulo de Entrada de Materia Prima y Calidad//**" {
   usecase "Gestionar Catálogos Maestros\n(Clientes y Proveedores)" as UC_Cat
   usecase "Registrar Entrada de Lote" as UC_Lote
-  usecase "Registrar Pesaje por Cajas\n(peso neto = peso bruto - tara)" as UC_Pesaje
+  usecase "Registrar Pesaje por Cajas\n(suma del peso de cada caja)" as UC_Pesaje
   usecase "Registrar Mediciones de Laboratorio\n(Brix / Materia Seca)" as UC_Lab
   usecase "Registrar Estado de Sub-lote\n(evalúa el umbral de maduración)" as UC_Sub
   usecase "Autorizar Traslado a Producción" as UC_Auth
