@@ -1,120 +1,89 @@
-# API REST (Node.js + Express + MySQL + BullMQ)
+# Backend — Sistema Integral de Producción y Distribución (Distribuidora Yaneth)
+
+API REST en Node.js + Express 5. Las operaciones de base de datos pasan por una cola BullMQ (Redis)
+y las ejecuta un worker contra MySQL. El worker corre **dentro del mismo proceso** que la API.
+
+- Frontend: [distri_yaneth_frontend](https://github.com/DecosUniversity/distri_yaneth_frontend)
+- Manual técnico completo (arquitectura, instalación, operación, respaldos): [docs/A_Manual_Tecnico/](docs/A_Manual_Tecnico/)
+- Documentación de endpoints: `GET /api-docs` (Swagger UI) y `GET /api-docs.json`
 
 ## Requisitos
 
-- Node.js 18+
-- MySQL activo
-- Redis activo (para BullMQ)
+| Componente | Versión |
+|---|---|
+| Node.js | 22 LTS (mínimo 20.19) |
+| MySQL | 8.0 (o MariaDB 10.6+) |
+| Redis | 7.x (mínimo 6.2) |
 
-## Configuracion
+## Desarrollo local
 
-1. Copia `.env.example` a `.env`.
-2. Ajusta las variables de conexion de MySQL y Redis en `.env`.
+```bash
+npm install
+cp .env.example .env          # ajustar DB_USER, DB_PASSWORD, DB_NAME=proyecto_graduacion, JWT_SECRET
 
-## Cola de consultas (BullMQ)
+mysql -u root -p -e "CREATE DATABASE proyecto_graduacion CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;"
+mysql -u root -p proyecto_graduacion < sql/schema.sql      # crea las 34 tablas (hace DROP TABLE IF EXISTS)
 
-- La API usa BullMQ como servidor de colas para operaciones de base de datos.
-- Todas las consultas de los modelos (`users`, `proveedores`, `clientes`, `productos`, `vehiculos`) se encolan primero.
-- Un worker procesa los jobs y ejecuta las consultas contra MySQL.
+docker run -d --name backend-redis -p 6379:6379 redis:7    # o un redis-server local
 
-## Scripts
-
-- `npm run dev`: inicia en desarrollo con nodemon.
-- `npm start`: inicia en modo normal.
-
-## Endpoints
-
-- `GET /health`
-- `GET /api/users`
-- `GET /api/users/:id`
-- `POST /api/users/login`
-- `POST /api/users`
-- `PUT /api/users/:id`
-- `DELETE /api/users/:id`
-- `GET /api/proveedores`
-- `GET /api/proveedores/:id`
-- `POST /api/proveedores`
-- `PUT /api/proveedores/:id`
-- `DELETE /api/proveedores/:id`
-- `GET /api/clientes`
-- `GET /api/clientes/:id`
-- `POST /api/clientes`
-- `PUT /api/clientes/:id`
-- `DELETE /api/clientes/:id`
-- `GET /api/productos`
-- `GET /api/productos/:id`
-- `POST /api/productos`
-- `PUT /api/productos/:id`
-- `DELETE /api/productos/:id`
-- `GET /api/vehiculos`
-- `GET /api/vehiculos/:id`
-- `POST /api/vehiculos`
-- `PUT /api/vehiculos/:id`
-- `DELETE /api/vehiculos/:id`
-- `GET /api/reporte-kilometraje-vehiculo`
-
-### Body ejemplo login
-
-```json
-{
-  "username": "admin",
-  "password": "123456"
-}
+npm run dev                   # http://localhost:3000/health
 ```
 
-### Body ejemplo usuarios
+El esquema no trae usuarios: crear el primer Administrador con un hash bcrypt
+(`node -e "console.log(require('bcryptjs').hashSync('<clave>', 10))"`) e insertarlo en `usuarios`.
 
-```json
-{
-  "nombre_completo": "Juan Perez",
-  "username": "juan",
-  "password_hash": "123456",
-  "rol": "admin"
-}
+### Scripts
+
+- `npm run dev`: API con nodemon (reinicia al guardar).
+- `npm start`: API en modo normal.
+- `npm test`: pruebas con Vitest.
+
+## Producción (resumen)
+
+Servidores Ubuntu Server 24.04. **Nginx** entrega el frontend compilado y reenvía `/api` a la API
+(PM2, puerto 3000 solo local). MySQL y Redis pueden estar **en el mismo servidor** (variante A) o
+**en servidores propios** dentro de la red privada (variante B):
+
+```
+Navegador ──HTTPS──> Nginx ──> API + worker (PM2, :3000) ──> MySQL  (127.0.0.1 o IP-DB)
+                                                        └──> Redis  (127.0.0.1 o IP-REDIS)
 ```
 
-### Body ejemplo proveedores
+| Variante | `DB_HOST` | `REDIS_HOST` | Notas |
+|---|---|---|---|
+| A. Todo en uno | `127.0.0.1` | `127.0.0.1` | MySQL y Redis escuchan solo en local |
+| B. Separados | IP privada de MySQL | IP privada de Redis | Usuario MySQL `'app_yaneth'@'<IP-APP>'`, `requirepass` en Redis, firewall que solo acepta a IP-APP |
 
-```json
-{
-  "nombre_empresa": "Proveedor ABC",
-  "nit": "1234-5",
-  "contacto_nombre": "Ana Gomez",
-  "telefono": "5555-1234"
-}
+Las conexiones hacia MySQL y Redis no van cifradas: en la variante B deben ir por red privada y
+los puertos 3306/6379 nunca se publican en Internet.
+
+```bash
+cd /opt/yaneth-sistema/Backend
+npm ci --omit=dev
+cp .env.example .env && chmod 600 .env      # credenciales reales, JWT_SECRET propio
+pm2 start src/server.js --name yaneth-api --exp-backoff-restart-delay=2000
+pm2 save && pm2 startup systemd
 ```
 
-### Body ejemplo clientes
+El procedimiento completo (3 jornadas, configuración de Nginx + Certbot, firewall por servidor,
+respaldos y checklist de aceptación) está en el capítulo 5 del
+[Manual Técnico](docs/A_Manual_Tecnico/Manual_Tecnico.pdf).
 
-```json
-{
-  "nombre_comercial": "Cliente XYZ",
-  "direccion_entrega": "Zona 10",
-  "telefono": "4444-9876",
-  "nit_facturacion": "CF"
-}
-```
+## Variables de entorno
 
-### Body ejemplo productos
+Ver [.env.example](.env.example). Las principales:
 
-```json
-{
-  "nombre": "Azucar Refinada",
-  "descripcion": "Presentacion bolsa 1kg",
-  "unidad_medida": "kg",
-  "tipo_producto": "Materia Prima",
-  "stock_minimo": 10,
-  "precio_venta_sugerido": 25.5
-}
-```
+| Variable | Descripción |
+|---|---|
+| `PORT` | Puerto de la API (3000) |
+| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Conexión a MySQL |
+| `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_DB` | Conexión a Redis |
+| `DB_QUEUE_NAME`, `DB_QUEUE_CONCURRENCY` | Cola BullMQ |
+| `MATURATION_BRIX_THRESHOLD` | Grados Brix para "Listo para producción" (22) |
+| `JWT_SECRET`, `JWT_EXPIRES_IN` | Firma y vigencia de la sesión |
 
-### Body ejemplo vehiculos
+## Base de datos
 
-```json
-{
-  "placa": "P123ABC",
-  "modelo": "NPR 2022",
-  "estado": "Disponible",
-  "kilometraje_actual": 12000.5
-}
-```
+- `sql/schema.sql`: esquema consolidado para instalaciones nuevas.
+- `sql/migrations/`: cambios fechados para actualizar bases existentes (se aplican en orden).
+- Diagrama ER y descripción: [docs/C_Esquema_BD/](docs/C_Esquema_BD/).

@@ -1,0 +1,39 @@
+@startuml despliegue_todo_en_uno
+' Variante A: Nginx, API, MySQL y Redis en un solo servidor Ubuntu.
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam ArrowColor #4D4D4D
+skinparam ArrowFontSize 12
+skinparam node {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+}
+skinparam database {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+}
+skinparam queue {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+}
+top to bottom direction
+
+rectangle "Navegador\n(oficina, planta, pilotos)" as nav
+
+node "Servidor Ubuntu 24.04\n(IP privada, firewall UFW)" as srv {
+  rectangle "Nginx\nfrontend compilado (/var/www/yaneth)\nproxy /api y /health" as nginx
+  rectangle "API REST + Worker\nNode.js 22 / PM2\npuerto 3000 (solo local)" as api
+  queue "Redis\n127.0.0.1:6379" as redis
+  database "MySQL 8\n127.0.0.1:3306" as mysql
+}
+
+nav --> srv : HTTPS 443\n(router: port forwarding 80/443)
+nginx --> api : HTTP local
+api --> redis : cola BullMQ
+api --> mysql : consultas y transacciones
+@enduml

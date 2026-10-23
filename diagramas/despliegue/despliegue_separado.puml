@@ -1,0 +1,41 @@
+@startuml despliegue_separado
+' Variante B: MySQL y Redis en servidores propios dentro de la red privada.
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam ArrowColor #4D4D4D
+skinparam ArrowFontSize 12
+skinparam node {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+}
+skinparam database {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+}
+skinparam queue {
+  BackgroundColor #FFFFFF
+  BorderColor #4D4D4D
+}
+top to bottom direction
+
+rectangle "Navegador\n(oficina, planta, pilotos)" as nav
+
+node "Servidor de aplicación\nUbuntu 24.04 — IP-APP" as app {
+  rectangle "Nginx\nfrontend compilado\nproxy /api y /health" as nginx
+  rectangle "API REST + Worker\nNode.js 22 / PM2\npuerto 3000 (solo local)" as api
+}
+
+database "Servidor de base de datos\nUbuntu 24.04 — IP-DB\n\nMySQL 8\n3306 (solo desde IP-APP)" as mysql
+
+queue "Servidor de colas\nUbuntu 24.04 — IP-REDIS\n\nRedis\n6379 (solo desde IP-APP,\ncon contraseña)" as redis
+
+nav --> app : HTTPS 443
+nginx --> api : HTTP local
+api --> mysql : red privada\nDB_HOST=IP-DB
+api --> redis : red privada\nREDIS_HOST=IP-REDIS
+@enduml
