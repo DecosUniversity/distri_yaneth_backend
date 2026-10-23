@@ -1,5 +1,5 @@
 const request = require('supertest');
-const { resetDatabase, seedBaseline } = require('../helpers/db');
+const { pool, resetDatabase, seedBaseline } = require('../helpers/db');
 const { startTestServer, stopTestServer } = require('../helpers/apiServer');
 const { signToken } = require('../helpers/authToken');
 
@@ -30,6 +30,15 @@ describe('POST /api/users/login', () => {
 
   it('rechaza una contrasena incorrecta', async () => {
     const response = await request(app).post('/api/users/login').send({ username: 'admin.test', password: 'incorrecta' });
+    expect(response.status).toBe(401);
+  });
+
+  it('rechaza una contrasena guardada en texto plano (sin cifrar)', async () => {
+    await pool.query(
+      "INSERT INTO usuarios (nombre_completo, username, password_hash, rol, estado_registro) VALUES ('Usuario Sin Cifrar', 'plano.test', 'plano123', 'Logistica', 'Activo')"
+    );
+
+    const response = await request(app).post('/api/users/login').send({ username: 'plano.test', password: 'plano123' });
     expect(response.status).toBe(401);
   });
 

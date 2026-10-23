@@ -177,9 +177,8 @@ const login = async (req, res, next) => {
       return res.status(401).json({ message: 'Credenciales invalidas' });
     }
 
-    const passwordMatches =
-      (await bcrypt.compare(password, user.password_hash).catch(() => false)) ||
-      password === user.password_hash;
+    // Solo contrasenas cifradas con bcrypt: un password_hash guardado en texto plano no da acceso.
+    const passwordMatches = await bcrypt.compare(password, user.password_hash).catch(() => false);
 
     if (!passwordMatches) {
       return res.status(401).json({ message: 'Credenciales invalidas' });

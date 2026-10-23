@@ -10,6 +10,7 @@
 
 require('dotenv').config();
 
+const bcrypt = require('bcryptjs');
 const { pool } = require('../src/config/db');
 
 const providerHandlers = require('../src/workers/domains/provider.worker').handlers;
@@ -55,7 +56,8 @@ const main = async () => {
     logisticaUser = await userHandlers['users.create']({
       nombre_completo: 'Maria Fernanda Lopez',
       username: 'maria.logistica',
-      password_hash: 'demo1234',
+      // El login solo acepta contrasenas cifradas con bcrypt.
+      password_hash: bcrypt.hashSync('demo1234', 10),
       rol: 'Logistica',
       id_usuario_modificacion: idAdmin,
     });

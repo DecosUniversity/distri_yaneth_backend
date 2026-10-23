@@ -2,14 +2,14 @@
 // rol del sistema. Es idempotente: si ya existen, no las vuelve a crear ni les cambia la
 // contrasena. No toca ninguna cuenta real del usuario.
 //
-// El login del backend acepta password_hash en texto plano como respaldo si bcrypt.compare
-// falla (ver src/controllers/user.controller.js), asi que igual que en seed_demo_data.js no
-// hace falta hashear aqui: el mismo texto sirve como password.
+// El login solo acepta contrasenas cifradas con bcrypt (ver src/controllers/user.controller.js),
+// y users.create guarda password_hash tal cual, asi que aqui se cifra antes de crear la cuenta.
 //
 // Uso: node scripts/seed_e2e_users.js   (desde la carpeta Backend, contra la base de datos REAL)
 
 require('dotenv').config();
 
+const bcrypt = require('bcryptjs');
 const { pool } = require('../src/config/db');
 const userHandlers = require('../src/workers/domains/user.worker').handlers;
 
@@ -50,7 +50,7 @@ const main = async () => {
     await userHandlers['users.create']({
       nombre_completo: spec.nombre_completo,
       username: spec.username,
-      password_hash: E2E_PASSWORD,
+      password_hash: bcrypt.hashSync(E2E_PASSWORD, 10),
       rol: spec.rol,
       id_usuario_modificacion: adminUser.id_usuario,
     });

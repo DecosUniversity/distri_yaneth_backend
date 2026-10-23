@@ -1,4 +1,9 @@
+const bcrypt = require('bcryptjs');
 const { pool } = require('../../src/config/db');
+
+// El login solo acepta contrasenas cifradas con bcrypt; admin.test inicia sesion con "x".
+// Se calcula una vez por proceso para no pagar el costo del hash en cada seedBaseline().
+const ADMIN_TEST_PASSWORD_HASH = bcrypt.hashSync('x', 10);
 
 // Orden alfabetico tomado de sql/schema.sql; TRUNCATE con FK checks apagados
 // evita tener que resolver el orden de dependencias a mano.
@@ -72,7 +77,8 @@ const resetDatabase = async () => {
 // producto terminado). Cada prueba especifica agrega lo demas que necesite.
 const seedBaseline = async () => {
   const [userResult] = await pool.query(
-    "INSERT INTO usuarios (nombre_completo, username, password_hash, rol, estado_registro) VALUES ('Admin Pruebas', 'admin.test', 'x', 'Administrador', 'Activo')"
+    "INSERT INTO usuarios (nombre_completo, username, password_hash, rol, estado_registro) VALUES ('Admin Pruebas', 'admin.test', ?, 'Administrador', 'Activo')",
+    [ADMIN_TEST_PASSWORD_HASH]
   );
   const idUsuario = userResult.insertId;
 
