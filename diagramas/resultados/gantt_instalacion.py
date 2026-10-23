@@ -13,7 +13,7 @@ font_b = ImageFont.truetype('C:/Windows/Fonts/segoeuib.ttf', 12 * K)
 font_title = ImageFont.truetype('C:/Windows/Fonts/segoeui.ttf', 13 * K)
 
 GRID, HEADER, BAR, BAR_EDGE, ZEBRA = (210, 210, 210), (240, 240, 240), (140, 182, 206), (70, 110, 140), (241, 241, 228)
-TASKS = [('Día 1 - Preparación del servidor', '21/10/26', 0),
+TASKS = [('Día 1 - Preparación de los servidores', '21/10/26', 0),
          ('Día 2 - Migración y configuración', '22/10/26', 1),
          ('Día 3 - Configuración inicial de datos y pruebas', '23/10/26', 2)]
 DAYS = [19, 20, 21, 22, 23, 24, 25]  # lun 19 - dom 25 de octubre de 2026
