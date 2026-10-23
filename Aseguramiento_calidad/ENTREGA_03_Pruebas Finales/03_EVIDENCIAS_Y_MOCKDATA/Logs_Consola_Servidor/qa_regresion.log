@@ -1,0 +1,93 @@
+=====================================================================
+ QA ENVIRONMENT LOG – Regresión posterior a la corrección (Entrega 03, Equipo 3)
+ Fecha: 2026-10-20   API: http://localhost:3100   BD: proyecto_graduacion_qa (copia de QA)
+ Backend Node.js/Express (commit 7c6cfb7) – MariaDB 10.4.32 (XAMPP) – Redis/BullMQ
+=====================================================================
+
+--- Autenticación ---
+[2026-10-20 13:54:51] [AUTH] POST /api/users/login (usuario: dennis, rol Administrador) -> token JWT obtenido
+
+--- BUG-CLI-01 · TC-REQ001-005 · NIT duplicado en catálogo de clientes ---
+[2026-10-20 13:54:51] [BUG-CLI-01] POST /api/clientes
+    request : {"nombre_comercial":"Cliente QA Original","departamento":"Guatemala","municipio":"Guatemala","zona":"10","direccion_entrega":"Zona 10","telefono":"55550001","nit_facturacion":"1234567-8"}
+    response: HTTP 201 {"id_cliente":7,"nombre_comercial":"Cliente QA Original","departamento":"Guatemala","municipio":"Guatemala","zona":"10","direccion_entrega":"Zona 10","telefono":"55550001","nit_facturacion":"1234567-8","estado_registro":"Activo","fecha_modificacion":"2026-10-20T19:54:51.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel"}
+[2026-10-20 13:54:51] [BUG-CLI-01] POST /api/clientes
+    request : {"nombre_comercial":"Cliente QA Duplicado","departamento":"Guatemala","municipio":"Guatemala","zona":"10","direccion_entrega":"Zona 10","telefono":"55550002","nit_facturacion":"1234567-8"}
+    response: HTTP 409 {"message":"Ya existe un cliente activo con ese NIT"}
+    verificación: clientes activos con NIT 1234567-8 = 1 (#7 Cliente QA Original)
+    RESULTADO: CORREGIDO – NIT duplicado rechazado (HTTP 409); solo existe el cliente original
+
+--- BUG-REC-01 · TC-REQ002-002 · Unidad de recepción con peso negativo ---
+[2026-10-20 13:54:51] [BUG-REC-01] POST /api/entradas-mercancia
+    request : {"id_proveedor":1,"id_producto":2,"fecha_vencimiento":"2026-12-31","cantidad_disponible":20,"documento_referencia":"LOT-QA-002","unidades":[{"unidad_codigo":"1","peso":20}]}
+    response: HTTP 201 {"id_entrada":28,"id_proveedor":1,"nombre_empresa":"Finca San Jose","fecha_recepcion":"2026-10-20T19:54:51.000Z","documento_referencia":"LOT-QA-002","costo_unitario":null,"costo_total":null,"id_usuario_receptor":1,"receptor_nombre":"Dennis Cornel","estado_registro":"Activo","fecha_modificacion":"2026-10-20T19:54:51.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel","codigo_lote":"BOD-261020-001","id_existencia":1,"id_producto":2,"producto_nombre":"Bolsas de empaque","fecha_vencimiento":"2026-12-31T06:00:00.000Z","cantidad_disponible":"20.00"}
+[2026-10-20 13:54:51] [BUG-REC-01] POST /api/entradas-mercancia/28/units
+    request : {"peso":-5}
+    response: HTTP 400 {"message":"peso debe ser mayor a 0"}
+[2026-10-20 13:54:51] [BUG-REC-01] GET /api/entradas-mercancia/28/units
+    response: HTTP 200 []
+    verificación: unidades registradas =  kg; suma = 0 kg
+    RESULTADO: CORREGIDO – la API rechazó el peso −5 kg (HTTP 400)
+
+--- BUG-PRO-01 · TC-REQ003-002 · Merma mayor que la entrada de la etapa ---
+    preparación: entrada #29 -> lote #19 -> sub-lote #16 (50 kg, Listo para producción)
+[2026-10-20 13:54:51] [BUG-PRO-01] POST /api/produccion/procesos
+    request : {"id_sublote":16,"id_producto_resultado":8,"cantidad_ingresada_kg":50}
+    response: HTTP 201 {"id_proceso":14,"id_sublote":16,"id_producto_resultado":8,"id_orden":null,"cantidad_ingresada_kg":"50.00","cantidad_producida_kg":null,"rendimiento_porcentaje":null,"estado_proceso":"En proceso","fecha_inicio":"2026-10-20T19:54:51.000Z","fecha_fin":null,"cuarto_congelado":null,"ubicacion_cuarto_congelado":null,"observaciones":null,"diferencia_kg":null,"justificacion_diferencia":null,"id_usuario_registro":1,"usuario_nombre":"Dennis Cornel","fecha_modificacion":"2026-10-20T19:54:51.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel","codigo_sublote":"A","sublote_peso …
+[2026-10-20 13:54:51] [BUG-PRO-01] POST /api/produccion/procesos/14/etapas
+    request : {"id_tipo_etapa":1,"fecha_inicio":"2026-10-20 13:54:51","cantidad_personas":2,"cantidad_entrada_kg":50}
+    response: HTTP 201 {"id_etapa":47,"id_proceso":14,"id_tipo_etapa":1,"nombre_etapa":"Pelado","cantidad_personas":2,"personal_asignado":null,"fecha_inicio":"2026-10-20T19:54:51.000Z","fecha_fin":null,"cantidad_entrada_kg":"50.00","cantidad_salida_kg":null,"merma_kg":null,"observaciones":null,"estado_registro":"Activo","fecha_creacion":"2026-10-20T19:54:51.000Z","fecha_modificacion":"2026-10-20T19:54:51.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel","cajas":[]}
+[2026-10-20 13:54:51] [BUG-PRO-01] POST /api/produccion/procesos/14/etapas
+    request : {"id_tipo_etapa":2,"fecha_inicio":"2026-10-20 13:54:51","cantidad_personas":2,"cantidad_entrada_kg":50}
+    response: HTTP 201 {"id_etapa":48,"id_proceso":14,"id_tipo_etapa":2,"nombre_etapa":"Corte","cantidad_personas":2,"personal_asignado":null,"fecha_inicio":"2026-10-20T19:54:51.000Z","fecha_fin":null,"cantidad_entrada_kg":"50.00","cantidad_salida_kg":null,"merma_kg":null,"observaciones":null,"estado_registro":"Activo","fecha_creacion":"2026-10-20T19:54:51.000Z","fecha_modificacion":"2026-10-20T19:54:51.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel","cajas":[]}
+[2026-10-20 13:54:51] [BUG-PRO-01] POST /api/produccion/procesos/14/mermas
+    request : {"id_etapa":48,"id_tipo_merma":3,"cantidad_kg":60,"observaciones":"TC-REQ003-002 merma 60 kg sobre entrada 50 kg"}
+    response: HTTP 400 {"message":"La merma supera la entrada de la etapa: mermas acumuladas 60.00 kg > entrada 50.00 kg"}
+    verificación: etapa Corte -> entrada 50.00 kg, merma null kg, salida null kg
+    RESULTADO: CORREGIDO – merma de 60 kg rechazada (HTTP 400); la etapa no registra la merma
+
+--- BUG-PRO-02 · TC-REQ003-008 · Justificación compuesta solo por espacios ---
+    preparación: entrada #30 -> lote #20 -> sub-lote #17 (200 kg, Listo para producción)
+[2026-10-20 13:54:52] [BUG-PRO-02] POST /api/produccion/procesos
+    request : {"id_sublote":17,"id_producto_resultado":8,"cantidad_ingresada_kg":200}
+    response: HTTP 201 {"id_proceso":15,"id_sublote":17,"id_producto_resultado":8,"id_orden":null,"cantidad_ingresada_kg":"200.00","cantidad_producida_kg":null,"rendimiento_porcentaje":null,"estado_proceso":"En proceso","fecha_inicio":"2026-10-20T19:54:52.000Z","fecha_fin":null,"cuarto_congelado":null,"ubicacion_cuarto_congelado":null,"observaciones":null,"diferencia_kg":null,"justificacion_diferencia":null,"id_usuario_registro":1,"usuario_nombre":"Dennis Cornel","fecha_modificacion":"2026-10-20T19:54:52.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel","codigo_sublote":"A","sublote_pes …
+[2026-10-20 13:54:52] [BUG-PRO-02] POST /api/produccion/procesos/15/etapas
+    request : {"id_tipo_etapa":1,"fecha_inicio":"2026-10-20 13:54:52","cantidad_personas":3,"cantidad_entrada_kg":200}
+    response: HTTP 201 {"id_etapa":49,"id_proceso":15,"id_tipo_etapa":1,"nombre_etapa":"Pelado","cantidad_personas":3,"personal_asignado":null,"fecha_inicio":"2026-10-20T19:54:52.000Z","fecha_fin":null,"cantidad_entrada_kg":"200.00","cantidad_salida_kg":null,"merma_kg":null,"observaciones":null,"estado_registro":"Activo","fecha_creacion":"2026-10-20T19:54:52.000Z","fecha_modificacion":"2026-10-20T19:54:52.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel","cajas":[]}
+[2026-10-20 13:54:52] [BUG-PRO-02] POST /api/produccion/procesos/15/etapas
+    request : {"id_tipo_etapa":2,"fecha_inicio":"2026-10-20 13:54:52","cantidad_personas":3,"cantidad_entrada_kg":180}
+    response: HTTP 201 {"id_etapa":50,"id_proceso":15,"id_tipo_etapa":2,"nombre_etapa":"Corte","cantidad_personas":3,"personal_asignado":null,"fecha_inicio":"2026-10-20T19:54:52.000Z","fecha_fin":null,"cantidad_entrada_kg":"180.00","cantidad_salida_kg":null,"merma_kg":null,"observaciones":null,"estado_registro":"Activo","fecha_creacion":"2026-10-20T19:54:52.000Z","fecha_modificacion":"2026-10-20T19:54:52.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel","cajas":[]}
+[2026-10-20 13:54:52] [BUG-PRO-02] POST /api/produccion/procesos/15/mermas
+    request : {"id_etapa":49,"id_tipo_merma":1,"cantidad_kg":20}
+    response: HTTP 201 {"id_merma":7,"id_proceso":15,"id_etapa":49,"id_tipo_merma":1,"nombre_merma":"Cascara","cantidad_kg":"20.00","observaciones":null,"fecha_registro":"2026-10-20T19:54:52.000Z","estado_registro":"Activo","fecha_creacion":"2026-10-20T19:54:52.000Z","fecha_modificacion":"2026-10-20T19:54:52.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel"}
+    control: mismo cierre con justificación vacía ("") para confirmar que la regla existe
+[2026-10-20 13:54:52] [BUG-PRO-02] POST /api/produccion/procesos/15/finalizar
+    request : {"cantidad_producida_kg":175,"fecha_fin":"2026-10-20 13:54:52","fecha_vencimiento":"2027-01-31","justificacion_diferencia":""}
+    response: HTTP 400 {"message":"El peso no cuadra: ingresado (200.00 kg) - mermas (20.00 kg) = 180.00 kg, pero se reporto 175.00 kg. Debes justificar la diferencia de 5.00 kg."}
+[2026-10-20 13:54:52] [BUG-PRO-02] POST /api/produccion/procesos/15/finalizar
+    request : {"cantidad_producida_kg":175,"fecha_fin":"2026-10-20 13:54:52","fecha_vencimiento":"2027-01-31","justificacion_diferencia":"   "}
+    response: HTTP 400 {"message":"El peso no cuadra: ingresado (200.00 kg) - mermas (20.00 kg) = 180.00 kg, pero se reporto 175.00 kg. Debes justificar la diferencia de 5.00 kg."}
+    verificación: estado_proceso="En proceso", diferencia_kg=null, justificacion_diferencia=null
+    control: el mismo cierre con una justificación real sí debe aceptarse (TC-REQ003-005)
+[2026-10-20 13:54:52] [BUG-PRO-02] POST /api/produccion/procesos/15/finalizar
+    request : {"cantidad_producida_kg":175,"fecha_fin":"2026-10-20 13:54:52","fecha_vencimiento":"2027-01-31","justificacion_diferencia":"Diferencia en pesaje manual."}
+    response: HTTP 200 {"id_proceso":15,"id_sublote":17,"id_producto_resultado":8,"id_orden":null,"cantidad_ingresada_kg":"200.00","cantidad_producida_kg":"175.00","rendimiento_porcentaje":"87.50","estado_proceso":"Finalizado","fecha_inicio":"2026-10-20T19:54:52.000Z","fecha_fin":"2026-10-20T19:54:52.000Z","cuarto_congelado":null,"ubicacion_cuarto_congelado":null,"observaciones":null,"diferencia_kg":"5.00","justificacion_diferencia":"Diferencia en pesaje manual.","id_usuario_registro":1,"usuario_nombre":"Dennis Cornel","fecha_modificacion":"2026-10-20T19:54:52.000Z","id_usuario_modificacion":1,"usuario_modificacion_ …
+    RESULTADO: CORREGIDO – justificación de solo espacios rechazada (HTTP 400); con justificación real sí cierra
+
+--- BUG-REP-01 · TC-REQ005-003 · Exportación a Excel ---
+    No aplica a la API: la exportación es responsabilidad del frontend (ver captura de Pedidos > Reportes).
+    verificación del archivo descargado desde la UI (Pedidos > Reportes, 01/10/2026 – 31/10/2026, todos los clientes):
+      archivo: reporte_pedidos_2026-10-01_2026-10-31.xlsx — se abre en Microsoft Excel sin errores
+      hojas: Resumen, Por cliente, Por producto, Detalle (22 líneas de pedido + fila Total)
+      Por producto: cantidades 18, 15, 14, 11, 11, 9 y 6 = idénticas a la tabla "Productos mas vendidos" en pantalla
+      Detalle: =SUM(J2:J23) = Q1,614.00 = "Valor total de pedidos" de la hoja Resumen = suma por cliente
+    RESULTADO: CORREGIDO – el botón "Descargar Excel" genera reporte_pedidos_<desde>_<hasta>.xlsx (ver verificación del archivo)
+
+--- BUG-REP-02 · TC-REQ005-004 · Intervalo de fechas invertido ---
+[2026-10-20 13:54:52] [BUG-REP-02] GET /api/pedidos/reportes/compras-por-cliente?desde=2026-10-15&hasta=2026-10-10
+    response: HTTP 400 {"message":"La fecha \"desde\" no puede ser posterior a \"hasta\""}
+[2026-10-20 13:54:52] [BUG-REP-02] GET /api/trazabilidad/filtrar?desde=2026-10-15&hasta=2026-10-10
+    response: HTTP 400 {"message":"La fecha \"desde\" no puede ser posterior a \"hasta\""}
+    RESULTADO: CORREGIDO – ambos endpoints rechazan el rango invertido (HTTP 400 / 400)
+
+Fin de la ejecución: 2026-10-20 13:54:52

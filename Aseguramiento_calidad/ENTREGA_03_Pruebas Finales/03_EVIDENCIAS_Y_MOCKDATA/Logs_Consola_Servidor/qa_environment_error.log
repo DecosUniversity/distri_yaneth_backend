@@ -1,0 +1,85 @@
+=====================================================================
+ QA ENVIRONMENT LOG – Reproducción de defectos (Entrega 03, Equipo 3)
+ Fecha: 2026-10-20   API: http://localhost:3100   BD: proyecto_graduacion_qa (copia de QA)
+ Backend Node.js/Express (commit 7c6cfb7) – MariaDB 10.4.32 (XAMPP) – Redis/BullMQ
+=====================================================================
+
+--- Autenticación ---
+[2026-10-20 13:18:22] [AUTH] POST /api/users/login (usuario: dennis, rol Administrador) -> token JWT obtenido
+
+--- BUG-CLI-01 · TC-REQ001-005 · NIT duplicado en catálogo de clientes ---
+[2026-10-20 13:18:22] [BUG-CLI-01] POST /api/clientes
+    request : {"nombre_comercial":"Cliente QA Original","departamento":"Guatemala","municipio":"Guatemala","zona":"10","direccion_entrega":"Zona 10","telefono":"55550001","nit_facturacion":"1234567-8"}
+    response: HTTP 201 {"id_cliente":7,"nombre_comercial":"Cliente QA Original","departamento":"Guatemala","municipio":"Guatemala","zona":"10","direccion_entrega":"Zona 10","telefono":"55550001","nit_facturacion":"1234567-8","estado_registro":"Activo","fecha_modificacion":"2026-10-20T19:18:22.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel"}
+[2026-10-20 13:18:23] [BUG-CLI-01] POST /api/clientes
+    request : {"nombre_comercial":"Cliente QA Duplicado","departamento":"Guatemala","municipio":"Guatemala","zona":"10","direccion_entrega":"Zona 10","telefono":"55550002","nit_facturacion":"1234567-8"}
+    response: HTTP 201 {"id_cliente":8,"nombre_comercial":"Cliente QA Duplicado","departamento":"Guatemala","municipio":"Guatemala","zona":"10","direccion_entrega":"Zona 10","telefono":"55550002","nit_facturacion":"1234567-8","estado_registro":"Activo","fecha_modificacion":"2026-10-20T19:18:22.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel"}
+    verificación: clientes activos con NIT 1234567-8 = 2 (#7 Cliente QA Original, #8 Cliente QA Duplicado)
+    RESULTADO: DEFECTO REPRODUCIDO – se aceptó el NIT duplicado
+
+--- BUG-REC-01 · TC-REQ002-002 · Unidad de recepción con peso negativo ---
+[2026-10-20 13:18:23] [BUG-REC-01] POST /api/entradas-mercancia
+    request : {"id_proveedor":1,"id_producto":2,"fecha_vencimiento":"2026-12-31","cantidad_disponible":20,"documento_referencia":"LOT-QA-002","unidades":[{"unidad_codigo":"1","peso":20}]}
+    response: HTTP 201 {"id_entrada":28,"id_proveedor":1,"nombre_empresa":"Finca San Jose","fecha_recepcion":"2026-10-20T19:18:23.000Z","documento_referencia":"LOT-QA-002","costo_unitario":null,"costo_total":null,"id_usuario_receptor":1,"receptor_nombre":"Dennis Cornel","estado_registro":"Activo","fecha_modificacion":"2026-10-20T19:18:23.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel","codigo_lote":"BOD-261020-001","id_existencia":1,"id_producto":2,"producto_nombre":"Bolsas de empaque","fecha_vencimiento":"2026-12-31T06:00:00.000Z","cantidad_disponible":"20.00"}
+[2026-10-20 13:18:23] [BUG-REC-01] POST /api/entradas-mercancia/28/units
+    request : {"peso":-5}
+    response: HTTP 201 {"id":3,"id_entrada":28,"unidad_codigo":"28-1","peso":"-5.0000","creado_por":1,"fecha_pesos":"2026-10-20T19:18:23.000Z","created_at":"2026-10-20T19:18:23.000Z"}
+[2026-10-20 13:18:23] [BUG-REC-01] GET /api/entradas-mercancia/28/units
+    response: HTTP 200 [{"id":3,"id_entrada":28,"unidad_codigo":"28-1","peso":"-5.0000","creado_por":1,"fecha_pesos":"2026-10-20T19:18:23.000Z","created_at":"2026-10-20T19:18:23.000Z"}]
+    verificación: unidades registradas = -5.0000 kg; suma = -5 kg
+    RESULTADO: DEFECTO REPRODUCIDO – la API aceptó peso −5 kg
+
+--- BUG-PRO-01 · TC-REQ003-002 · Merma mayor que la entrada de la etapa ---
+    preparación: entrada #29 -> lote #19 -> sub-lote #16 (50 kg, Listo para producción)
+[2026-10-20 13:18:23] [BUG-PRO-01] POST /api/produccion/procesos
+    request : {"id_sublote":16,"id_producto_resultado":8,"cantidad_ingresada_kg":50}
+    response: HTTP 201 {"id_proceso":14,"id_sublote":16,"id_producto_resultado":8,"id_orden":null,"cantidad_ingresada_kg":"50.00","cantidad_producida_kg":null,"rendimiento_porcentaje":null,"estado_proceso":"En proceso","fecha_inicio":"2026-10-20T19:18:23.000Z","fecha_fin":null,"cuarto_congelado":null,"ubicacion_cuarto_congelado":null,"observaciones":null,"diferencia_kg":null,"justificacion_diferencia":null,"id_usuario_registro":1,"usuario_nombre":"Dennis Cornel","fecha_modificacion":"2026-10-20T19:18:23.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel","codigo_sublote":"A","sublote_peso …
+[2026-10-20 13:18:23] [BUG-PRO-01] POST /api/produccion/procesos/14/etapas
+    request : {"id_tipo_etapa":1,"fecha_inicio":"2026-10-20 13:18:23","cantidad_personas":2,"cantidad_entrada_kg":50}
+    response: HTTP 201 {"id_etapa":47,"id_proceso":14,"id_tipo_etapa":1,"nombre_etapa":"Pelado","cantidad_personas":2,"personal_asignado":null,"fecha_inicio":"2026-10-20T19:18:23.000Z","fecha_fin":null,"cantidad_entrada_kg":"50.00","cantidad_salida_kg":null,"merma_kg":null,"observaciones":null,"estado_registro":"Activo","fecha_creacion":"2026-10-20T19:18:23.000Z","fecha_modificacion":"2026-10-20T19:18:23.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel","cajas":[]}
+[2026-10-20 13:18:23] [BUG-PRO-01] POST /api/produccion/procesos/14/etapas
+    request : {"id_tipo_etapa":2,"fecha_inicio":"2026-10-20 13:18:23","cantidad_personas":2,"cantidad_entrada_kg":50}
+    response: HTTP 201 {"id_etapa":48,"id_proceso":14,"id_tipo_etapa":2,"nombre_etapa":"Corte","cantidad_personas":2,"personal_asignado":null,"fecha_inicio":"2026-10-20T19:18:23.000Z","fecha_fin":null,"cantidad_entrada_kg":"50.00","cantidad_salida_kg":null,"merma_kg":null,"observaciones":null,"estado_registro":"Activo","fecha_creacion":"2026-10-20T19:18:23.000Z","fecha_modificacion":"2026-10-20T19:18:23.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel","cajas":[]}
+[2026-10-20 13:18:23] [BUG-PRO-01] POST /api/produccion/procesos/14/mermas
+    request : {"id_etapa":48,"id_tipo_merma":3,"cantidad_kg":60,"observaciones":"TC-REQ003-002 merma 60 kg sobre entrada 50 kg"}
+    response: HTTP 201 {"id_merma":7,"id_proceso":14,"id_etapa":48,"id_tipo_merma":3,"nombre_merma":"Desperdicio de puntas","cantidad_kg":"60.00","observaciones":"TC-REQ003-002 merma 60 kg sobre entrada 50 kg","fecha_registro":"2026-10-20T19:18:23.000Z","estado_registro":"Activo","fecha_creacion":"2026-10-20T19:18:23.000Z","fecha_modificacion":"2026-10-20T19:18:23.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel"}
+    verificación: etapa Corte -> entrada 50.00 kg, merma 60.00 kg, salida 0.00 kg
+    RESULTADO: DEFECTO REPRODUCIDO – merma de 60 kg aceptada sobre 50 kg de entrada
+
+--- BUG-PRO-02 · TC-REQ003-008 · Justificación compuesta solo por espacios ---
+    preparación: entrada #30 -> lote #20 -> sub-lote #17 (200 kg, Listo para producción)
+[2026-10-20 13:18:23] [BUG-PRO-02] POST /api/produccion/procesos
+    request : {"id_sublote":17,"id_producto_resultado":8,"cantidad_ingresada_kg":200}
+    response: HTTP 201 {"id_proceso":15,"id_sublote":17,"id_producto_resultado":8,"id_orden":null,"cantidad_ingresada_kg":"200.00","cantidad_producida_kg":null,"rendimiento_porcentaje":null,"estado_proceso":"En proceso","fecha_inicio":"2026-10-20T19:18:23.000Z","fecha_fin":null,"cuarto_congelado":null,"ubicacion_cuarto_congelado":null,"observaciones":null,"diferencia_kg":null,"justificacion_diferencia":null,"id_usuario_registro":1,"usuario_nombre":"Dennis Cornel","fecha_modificacion":"2026-10-20T19:18:23.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel","codigo_sublote":"A","sublote_pes …
+[2026-10-20 13:18:23] [BUG-PRO-02] POST /api/produccion/procesos/15/etapas
+    request : {"id_tipo_etapa":1,"fecha_inicio":"2026-10-20 13:18:23","cantidad_personas":3,"cantidad_entrada_kg":200}
+    response: HTTP 201 {"id_etapa":49,"id_proceso":15,"id_tipo_etapa":1,"nombre_etapa":"Pelado","cantidad_personas":3,"personal_asignado":null,"fecha_inicio":"2026-10-20T19:18:23.000Z","fecha_fin":null,"cantidad_entrada_kg":"200.00","cantidad_salida_kg":null,"merma_kg":null,"observaciones":null,"estado_registro":"Activo","fecha_creacion":"2026-10-20T19:18:23.000Z","fecha_modificacion":"2026-10-20T19:18:23.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel","cajas":[]}
+[2026-10-20 13:18:23] [BUG-PRO-02] POST /api/produccion/procesos/15/etapas
+    request : {"id_tipo_etapa":2,"fecha_inicio":"2026-10-20 13:18:23","cantidad_personas":3,"cantidad_entrada_kg":180}
+    response: HTTP 201 {"id_etapa":50,"id_proceso":15,"id_tipo_etapa":2,"nombre_etapa":"Corte","cantidad_personas":3,"personal_asignado":null,"fecha_inicio":"2026-10-20T19:18:23.000Z","fecha_fin":null,"cantidad_entrada_kg":"180.00","cantidad_salida_kg":null,"merma_kg":null,"observaciones":null,"estado_registro":"Activo","fecha_creacion":"2026-10-20T19:18:23.000Z","fecha_modificacion":"2026-10-20T19:18:23.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel","cajas":[]}
+[2026-10-20 13:18:23] [BUG-PRO-02] POST /api/produccion/procesos/15/mermas
+    request : {"id_etapa":49,"id_tipo_merma":1,"cantidad_kg":20}
+    response: HTTP 201 {"id_merma":8,"id_proceso":15,"id_etapa":49,"id_tipo_merma":1,"nombre_merma":"Cascara","cantidad_kg":"20.00","observaciones":null,"fecha_registro":"2026-10-20T19:18:23.000Z","estado_registro":"Activo","fecha_creacion":"2026-10-20T19:18:23.000Z","fecha_modificacion":"2026-10-20T19:18:23.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel"}
+    control: mismo cierre con justificación vacía ("") para confirmar que la regla existe
+[2026-10-20 13:18:23] [BUG-PRO-02] POST /api/produccion/procesos/15/finalizar
+    request : {"cantidad_producida_kg":175,"fecha_fin":"2026-10-20 13:18:23","fecha_vencimiento":"2027-01-31","justificacion_diferencia":""}
+    response: HTTP 400 {"message":"El peso no cuadra: ingresado (200.00 kg) - mermas (20.00 kg) = 180.00 kg, pero se reporto 175.00 kg. Debes justificar la diferencia de 5.00 kg."}
+[2026-10-20 13:18:23] [BUG-PRO-02] POST /api/produccion/procesos/15/finalizar
+    request : {"cantidad_producida_kg":175,"fecha_fin":"2026-10-20 13:18:23","fecha_vencimiento":"2027-01-31","justificacion_diferencia":"   "}
+    response: HTTP 200 {"id_proceso":15,"id_sublote":17,"id_producto_resultado":8,"id_orden":null,"cantidad_ingresada_kg":"200.00","cantidad_producida_kg":"175.00","rendimiento_porcentaje":"87.50","estado_proceso":"Finalizado","fecha_inicio":"2026-10-20T19:18:23.000Z","fecha_fin":"2026-10-20T19:18:23.000Z","cuarto_congelado":null,"ubicacion_cuarto_congelado":null,"observaciones":null,"diferencia_kg":"5.00","justificacion_diferencia":"   ","id_usuario_registro":1,"usuario_nombre":"Dennis Cornel","fecha_modificacion":"2026-10-20T19:18:23.000Z","id_usuario_modificacion":1,"usuario_modificacion_nombre":"Dennis Cornel"," …
+    verificación: estado_proceso="Finalizado", diferencia_kg=5.00, justificacion_diferencia="   "
+    RESULTADO: DEFECTO REPRODUCIDO – se cerró con justificación de solo espacios
+
+--- BUG-REP-01 · TC-REQ005-003 · Exportación a Excel ---
+    No aplica a la API: la exportación es responsabilidad del frontend. Revisión de la UI de
+    Pedidos > Reporte e Inventario: solo existe el botón "Descargar PDF" (ver captura).
+    RESULTADO: DEFECTO REPRODUCIDO – no hay opción de exportación a Excel
+
+--- BUG-REP-02 · TC-REQ005-004 · Intervalo de fechas invertido ---
+[2026-10-20 13:18:23] [BUG-REP-02] GET /api/pedidos/reportes/compras-por-cliente?desde=2026-10-15&hasta=2026-10-10
+    response: HTTP 200 []
+[2026-10-20 13:18:23] [BUG-REP-02] GET /api/trazabilidad/filtrar?desde=2026-10-15&hasta=2026-10-10
+    response: HTTP 200 []
+    RESULTADO: DEFECTO REPRODUCIDO – ambos endpoints responden 200 sin validar el orden de las fechas
+
+Fin de la ejecución: 2026-10-20 13:18:23
