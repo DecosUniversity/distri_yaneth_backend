@@ -44,8 +44,9 @@ const orderDetailQueries = {
   // Existencias del producto con stock disponible (Entrada - Salida/Ajuste/Desperdicio),
   // ordenadas FIFO por fecha de vencimiento; misma logica que production.worker usa para
   // consumir insumos. Si se pasa id_existencia, filtra a esa unica fila (para bloquearla y
-  // validar la seleccion manual del usuario).
-  findAvailableExistencias: (withExistenciaFilter) => `SELECT ie.id_existencia, ie.fecha_vencimiento, ie.id_proveedor, prov.nombre_empresa, COALESCE(stock.cantidad_disponible, 0) AS cantidad_disponible FROM ${INVENTORY_TABLE} ie LEFT JOIN ${PROVIDERS_TABLE} prov ON prov.id_proveedor = ie.id_proveedor LEFT JOIN (SELECT id_existencia, SUM(CASE WHEN tipo_movimiento = 'Entrada' THEN cantidad WHEN tipo_movimiento IN ('Salida', 'Ajuste', 'Desperdicio') THEN -cantidad ELSE 0 END) AS cantidad_disponible FROM ${MOVEMENTS_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' GROUP BY id_existencia) stock ON stock.id_existencia = ie.id_existencia WHERE ie.id_producto = ? AND ie.estado_registro = '${ACTIVE_STATE}'${withExistenciaFilter ? ' AND ie.id_existencia = ?' : ''} ORDER BY ie.fecha_vencimiento ASC, ie.id_existencia ASC FOR UPDATE`,
+  // validar la seleccion manual del usuario). `vencida` permite excluir del FIFO el producto
+  // que ya paso su fecha de vencimiento (se puede vender el mismo dia que vence).
+  findAvailableExistencias: (withExistenciaFilter) => `SELECT ie.id_existencia, ie.fecha_vencimiento, (ie.fecha_vencimiento < CURDATE()) AS vencida, ie.id_proveedor, prov.nombre_empresa, COALESCE(stock.cantidad_disponible, 0) AS cantidad_disponible FROM ${INVENTORY_TABLE} ie LEFT JOIN ${PROVIDERS_TABLE} prov ON prov.id_proveedor = ie.id_proveedor LEFT JOIN (SELECT id_existencia, SUM(CASE WHEN tipo_movimiento = 'Entrada' THEN cantidad WHEN tipo_movimiento IN ('Salida', 'Ajuste', 'Desperdicio') THEN -cantidad ELSE 0 END) AS cantidad_disponible FROM ${MOVEMENTS_TABLE} WHERE estado_registro = '${ACTIVE_STATE}' GROUP BY id_existencia) stock ON stock.id_existencia = ie.id_existencia WHERE ie.id_producto = ? AND ie.estado_registro = '${ACTIVE_STATE}'${withExistenciaFilter ? ' AND ie.id_existencia = ?' : ''} ORDER BY ie.fecha_vencimiento ASC, ie.id_existencia ASC FOR UPDATE`,
   // Una linea Parcial/Rechazada ya es un resultado definitivo de la entrega (no depende
   // de que la ruta se cierre): se detecta como pendiente de devolucion de inmediato.
   // Una linea que se quedo en Pendiente solo cuenta si la ruta ya se cerro con el pedido
@@ -243,10 +244,15 @@ const handlers = {
 
         // Sin id_existencia: se sugiere/asigna automaticamente la mas antigua por vencimiento
         // (FIFO) con stock suficiente. Con id_existencia: se respeta la seleccion manual del
-        // usuario, validando que tenga stock suficiente.
+        // usuario, validando que tenga stock suficiente. En ningun caso se despacha producto vencido.
         const selected = idExistenciaSolicitada
           ? existenciaRows[0]
-          : existenciaRows.find((row) => Number(row.cantidad_disponible) >= cantidadSolicitada);
+          : existenciaRows.find((row) => !Number(row.vencida) && Number(row.cantidad_disponible) >= cantidadSolicitada);
+
+        if (idExistenciaSolicitada && selected && Number(selected.vencida)) {
+          await connection.rollback();
+          throw new Error('La existencia seleccionada esta vencida');
+        }
 
         if (!selected) {
           await connection.rollback();

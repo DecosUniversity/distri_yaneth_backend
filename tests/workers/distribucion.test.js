@@ -66,6 +66,37 @@ describe('orders.create: asignacion de lote (existencia)', () => {
     expect(order.lineas[0].id_existencia).toBe(idNuevo);
   });
 
+  it('nunca asigna producto vencido: el FIFO salta al siguiente lote y la seleccion manual se rechaza', async () => {
+    const [[{ ayer }]] = await pool.query("SELECT DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 DAY), '%Y-%m-%d') AS ayer");
+    const idVencido = await createFinishedProductStock({
+      idProducto: baseline.idProductoTerminado,
+      cantidad: 10,
+      fechaVencimiento: ayer,
+    });
+    const idVigente = await createFinishedProductStock({
+      idProducto: baseline.idProductoTerminado,
+      cantidad: 10,
+      fechaVencimiento: '2030-01-01',
+    });
+
+    const order = await orderHandlers['orders.create']({
+      id_cliente: baseline.idCliente,
+      observaciones: null,
+      id_usuario_creacion: baseline.idUsuario,
+      lineas: [{ id_producto: baseline.idProductoTerminado, cantidad: 4 }],
+    });
+    expect(order.lineas[0].id_existencia).toBe(idVigente);
+
+    await expect(
+      orderHandlers['orders.create']({
+        id_cliente: baseline.idCliente,
+        observaciones: null,
+        id_usuario_creacion: baseline.idUsuario,
+        lineas: [{ id_producto: baseline.idProductoTerminado, cantidad: 4, id_existencia: idVencido }],
+      })
+    ).rejects.toThrow('La existencia seleccionada esta vencida');
+  });
+
   it('rechaza el pedido si no hay stock suficiente en ningun lote', async () => {
     await createFinishedProductStock({ idProducto: baseline.idProductoTerminado, cantidad: 3 });
 

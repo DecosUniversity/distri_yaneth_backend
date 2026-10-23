@@ -8,6 +8,7 @@ const BUSINESS_RULE_MESSAGES = [
   'No hay suficiente inventario disponible para el producto solicitado',
   'La existencia seleccionada no existe o no tiene stock suficiente',
   'La existencia seleccionada no tiene stock suficiente',
+  'La existencia seleccionada esta vencida',
   'El pedido ya no esta en curso; no se puede cambiar su fecha de entrega',
 ];
 

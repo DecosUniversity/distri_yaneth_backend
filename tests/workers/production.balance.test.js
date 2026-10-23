@@ -1,5 +1,5 @@
 const { pool, resetDatabase, seedBaseline } = require('../helpers/db');
-const { createReadySublot } = require('../helpers/fixtures');
+const { createReadySublot, createFinishedProductStock } = require('../helpers/fixtures');
 const { handlers } = require('../../src/workers/domains/production.worker.js');
 const { handlers: productionOrderHandlers } = require('../../src/workers/domains/production_order.worker.js');
 
@@ -398,5 +398,35 @@ describe('ordenes de produccion: guias a producir', () => {
       id_usuario_modificacion: baseline.idUsuario,
     });
     expect(cannotCancel).toBeNull();
+  });
+});
+
+describe('productionProcesses.addInsumo - caducidad', () => {
+  it('consume el insumo del lote vigente aunque exista uno vencido mas antiguo', async () => {
+    const [insumoResult] = await pool.query(
+      "INSERT INTO productos (nombre, unidad_medida, tipo_producto, estado_registro) VALUES ('Bolsa de empaque', 'Unidades', 'Insumo', 'Activo')"
+    );
+    const idInsumo = insumoResult.insertId;
+    const [[{ ayer }]] = await pool.query("SELECT DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 DAY), '%Y-%m-%d') AS ayer");
+    const idVencido = await createFinishedProductStock({ idProducto: idInsumo, cantidad: 10, fechaVencimiento: ayer });
+    const idVigente = await createFinishedProductStock({ idProducto: idInsumo, cantidad: 10, fechaVencimiento: '2030-01-01' });
+
+    const proceso = await startProcess();
+
+    await handlers['productionProcesses.addInsumo']({
+      id: proceso.id_proceso,
+      id_etapa: null,
+      id_producto: idInsumo,
+      cantidad: 4,
+      unidad_medida: 'Unidades',
+      observaciones: null,
+      id_usuario_modificacion: baseline.idUsuario,
+    });
+
+    const [salidas] = await pool.query(
+      "SELECT id_existencia FROM movimientos_inventario WHERE tipo_movimiento = 'Salida' AND id_existencia IN (?, ?)",
+      [idVencido, idVigente]
+    );
+    expect(salidas).toEqual([{ id_existencia: idVigente }]);
   });
 });
