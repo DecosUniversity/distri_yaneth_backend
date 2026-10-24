@@ -80,7 +80,7 @@ Ver [.env.example](.env.example). Las principales:
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_DB` | Conexión a Redis |
 | `DB_QUEUE_NAME`, `DB_QUEUE_CONCURRENCY` | Cola BullMQ |
 | `MATURATION_BRIX_THRESHOLD` | Grados Brix para "Listo para producción" (22) |
-| `JWT_SECRET`, `JWT_EXPIRES_IN` | Firma y vigencia de la sesión |
+| `JWT_SECRET`, `JWT_EXPIRES_IN` | Firma y vigencia de la sesión. `JWT_SECRET` es obligatoria (mínimo 32 caracteres, distinta del ejemplo): sin ella el servidor no arranca. Generarla con `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
 
 ## Base de datos
 

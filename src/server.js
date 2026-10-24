@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const app = require('./app');
+const { getJwtSecret } = require('./config/auth');
 const { testConnection } = require('./config/db');
 const { ensureDbQueueReady } = require('./queues/db.queue');
 const { startDbWorker } = require('./workers/db.worker');
@@ -9,6 +10,7 @@ const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {
   try {
+    getJwtSecret();
     await testConnection();
     await ensureDbQueueReady();
     await startDbWorker();

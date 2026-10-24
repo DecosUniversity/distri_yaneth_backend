@@ -1,9 +1,9 @@
 const userModel = require('../models/user.model');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { getJwtSecret } = require('../config/auth');
 
 const parseId = (value) => Number.parseInt(value, 10);
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 
 const sanitizeUser = (user) => ({
@@ -190,7 +190,7 @@ const login = async (req, res, next) => {
         username: user.username,
         rol: user.rol,
       },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: JWT_EXPIRES_IN }
     );
 
