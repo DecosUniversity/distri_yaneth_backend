@@ -1,5 +1,5 @@
 -- Schema consolidado de produccion (banano/platano) - generado automaticamente
--- Fecha de generacion: 2026-10-09
+-- Fecha de generacion: 2026-10-23 (incluye la migracion 2026-10-23_add_control_combustible)
 -- Uso: crear la base de datos vacia y ejecutar este archivo completo para levantar el esquema.
 -- No incluye datos ni usuarios. Crea un usuario Administrador despues de desplegar (ver nota al final).
 
