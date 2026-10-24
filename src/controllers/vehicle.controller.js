@@ -33,8 +33,18 @@ const getVehicleById = async (req, res, next) => {
   }
 };
 
+const MAX_TANK_GALLONS = 200;
+
+// Capacidad del tanque en galones: opcional; null la deja sin registrar.
+const parseTankCapacity = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  return Number(value);
+};
+
 const validateVehiclePayload = (payload) => {
   const { placa, estado, kilometraje_actual } = payload;
+  const capacidad = parseTankCapacity(payload.capacidad_tanque_galones);
 
   if (!placa) {
     return 'placa es obligatoria';
@@ -46,6 +56,10 @@ const validateVehiclePayload = (payload) => {
 
   if (kilometraje_actual !== undefined && Number.isNaN(Number(kilometraje_actual))) {
     return 'kilometraje_actual debe ser numerico';
+  }
+
+  if (capacidad !== undefined && capacidad !== null && !(capacidad > 0 && capacidad <= MAX_TANK_GALLONS)) {
+    return `capacidad_tanque_galones debe ser mayor a 0 y hasta ${MAX_TANK_GALLONS} galones`;
   }
 
   return null;
@@ -78,6 +92,7 @@ const createVehicle = async (req, res, next) => {
       modelo,
       estado,
       kilometraje_actual,
+      capacidad_tanque_galones: parseTankCapacity(req.body.capacidad_tanque_galones) ?? null,
       id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
@@ -139,6 +154,7 @@ const updateVehicle = async (req, res, next) => {
       modelo,
       estado,
       kilometraje_actual,
+      capacidad_tanque_galones: parseTankCapacity(req.body.capacidad_tanque_galones),
       id_usuario_modificador: modifierUserId,
     });
 

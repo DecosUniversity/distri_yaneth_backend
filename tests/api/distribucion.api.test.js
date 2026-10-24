@@ -33,6 +33,7 @@ describe('flujo completo por HTTP: pedido -> ruta -> salida -> entregas -> cierr
       .set('Authorization', authHeader)
       .send({
         id_cliente: baseline.idCliente,
+        fecha_entrega_programada: '2026-09-10',
         lineas: [{ id_producto: baseline.idProductoTerminado, cantidad: 8 }],
       });
 
@@ -51,7 +52,7 @@ describe('flujo completo por HTTP: pedido -> ruta -> salida -> entregas -> cierr
     const salidaResponse = await request(app)
       .put(`/api/rutas/${idRuta}/salida`)
       .set('Authorization', authHeader)
-      .send({ km_salida: 1000 });
+      .send({ km_salida: 1000, nivel_tanque_salida: 8 });
 
     expect(salidaResponse.status).toBe(200);
     expect(salidaResponse.body.estado).toBe('En Ruta');
@@ -66,7 +67,7 @@ describe('flujo completo por HTTP: pedido -> ruta -> salida -> entregas -> cierr
     const cierreResponse = await request(app)
       .put(`/api/rutas/${idRuta}/cerrar`)
       .set('Authorization', authHeader)
-      .send({ km_llegada: 1050 });
+      .send({ km_llegada: 1050, nivel_tanque_llegada: 6 });
 
     expect(cierreResponse.status).toBe(200);
     expect(cierreResponse.body.estado).toBe('Cerrada');
@@ -88,6 +89,7 @@ describe('flujo completo por HTTP: pedido -> ruta -> salida -> entregas -> cierr
       .set('Authorization', authHeader)
       .send({
         id_cliente: baseline.idCliente,
+        fecha_entrega_programada: '2026-09-10',
         lineas: [{ id_producto: baseline.idProductoTerminado, cantidad: 6 }],
       });
     const idPedido = orderResponse.body.id_pedido;
@@ -99,12 +101,12 @@ describe('flujo completo por HTTP: pedido -> ruta -> salida -> entregas -> cierr
       .send({ id_pedidos: [idPedido], id_vehiculo: idVehiculo, id_piloto: idPiloto });
     const idRuta = routeResponse.body.id_ruta;
 
-    await request(app).put(`/api/rutas/${idRuta}/salida`).set('Authorization', authHeader).send({ km_salida: 200 });
+    await request(app).put(`/api/rutas/${idRuta}/salida`).set('Authorization', authHeader).send({ km_salida: 200, nivel_tanque_salida: 8 });
     await request(app)
       .put(`/api/rutas/${idRuta}/entregas`)
       .set('Authorization', authHeader)
       .send({ entregas: [{ id_detalle: idDetalle, cantidad_entregada: 0 }] });
-    await request(app).put(`/api/rutas/${idRuta}/cerrar`).set('Authorization', authHeader).send({ km_llegada: 230 });
+    await request(app).put(`/api/rutas/${idRuta}/cerrar`).set('Authorization', authHeader).send({ km_llegada: 230, nivel_tanque_llegada: 6 });
 
     const [orderRows] = await pool.query('SELECT estado FROM pedidos WHERE id_pedido = ?', [idPedido]);
     expect(orderRows[0].estado).toBe('Con Devolucion');
@@ -170,6 +172,7 @@ describe('fecha_entrega_programada de un pedido', () => {
       .set('Authorization', authHeader)
       .send({
         id_cliente: baseline.idCliente,
+        fecha_entrega_programada: '2026-09-10',
         lineas: [{ id_producto: baseline.idProductoTerminado, cantidad: 2 }],
       });
 
@@ -190,6 +193,7 @@ describe('GET /api/pedidos/reportes/pedidos-del-dia', () => {
       .set('Authorization', authHeader)
       .send({
         id_cliente: baseline.idCliente,
+        fecha_entrega_programada: '2026-09-10',
         lineas: [{ id_producto: baseline.idProductoTerminado, cantidad: 2 }],
       });
 
@@ -221,6 +225,7 @@ describe('devoluciones: deteccion automatica y control de roles', () => {
       .set('Authorization', authHeader)
       .send({
         id_cliente: baseline.idCliente,
+        fecha_entrega_programada: '2026-09-10',
         lineas: [{ id_producto: baseline.idProductoTerminado, cantidad: 4 }],
       });
     const idDetalle = orderResponse.body.lineas[0].id_detalle;
@@ -231,7 +236,7 @@ describe('devoluciones: deteccion automatica y control de roles', () => {
       .send({ id_pedidos: [orderResponse.body.id_pedido], id_vehiculo: idVehiculo, id_piloto: idPiloto });
     const idRuta = routeResponse.body.id_ruta;
 
-    await request(app).put(`/api/rutas/${idRuta}/salida`).set('Authorization', authHeader).send({ km_salida: 10 });
+    await request(app).put(`/api/rutas/${idRuta}/salida`).set('Authorization', authHeader).send({ km_salida: 10, nivel_tanque_salida: 8 });
 
     const entregasResponse = await request(app)
       .put(`/api/rutas/${idRuta}/entregas`)
@@ -262,6 +267,7 @@ describe('devoluciones: deteccion automatica y control de roles', () => {
       .set('Authorization', authHeader)
       .send({
         id_cliente: baseline.idCliente,
+        fecha_entrega_programada: '2026-09-10',
         lineas: [{ id_producto: baseline.idProductoTerminado, cantidad: 3 }],
       });
     const idDetalle = orderResponse.body.lineas[0].id_detalle;
@@ -272,7 +278,7 @@ describe('devoluciones: deteccion automatica y control de roles', () => {
       .send({ id_pedidos: [orderResponse.body.id_pedido], id_vehiculo: idVehiculo, id_piloto: idPiloto });
     const idRuta = routeResponse.body.id_ruta;
 
-    await request(app).put(`/api/rutas/${idRuta}/salida`).set('Authorization', authHeader).send({ km_salida: 10 });
+    await request(app).put(`/api/rutas/${idRuta}/salida`).set('Authorization', authHeader).send({ km_salida: 10, nivel_tanque_salida: 8 });
     await request(app)
       .put(`/api/rutas/${idRuta}/entregas`)
       .set('Authorization', authHeader)

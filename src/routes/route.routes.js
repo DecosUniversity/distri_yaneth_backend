@@ -29,6 +29,36 @@ router.get('/', routeController.getRutas);
 
 /**
  * @swagger
+ * /api/rutas/reportes/indicadores:
+ *   get:
+ *     summary: Indicadores de logistica de las rutas cerradas (combustible, costo, duracion, puntualidad)
+ *     description: |
+ *       Calcula, en total, por mes y por vehiculo, el consumo de combustible (a partir de los niveles
+ *       de tanque y las facturas), km por galon, costo, duracion de las rutas, puntualidad de las
+ *       entregas y porcentaje de pedidos sin devolucion. Solo Administrador o Logistica.
+ *     tags: [Rutas]
+ *     parameters:
+ *       - in: query
+ *         name: desde
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: hasta
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: id_vehiculo
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Indicadores (resumen, por_mes, por_vehiculo y rutas)
+ *       400:
+ *         description: Filtros invalidos
+ *       403:
+ *         description: Solo Administrador o Logistica
+ */
+router.get('/reportes/indicadores', routeController.getIndicadores);
+
+/**
+ * @swagger
  * /api/rutas/{id}:
  *   get:
  *     summary: Obtiene una ruta por id
@@ -80,7 +110,8 @@ router.post('/', routeController.createRuta);
  * @swagger
  * /api/rutas/{id}/salida:
  *   put:
- *     summary: Registra la salida de una ruta (km inicial, combustible)
+ *     summary: Registra la salida de una ruta (km inicial y nivel del tanque)
+ *     description: Devuelve en alertas_combustible los avisos si el nivel no coincide con la llegada anterior del vehiculo.
  *     tags: [Rutas]
  *     parameters:
  *       - in: path
@@ -93,10 +124,10 @@ router.post('/', routeController.createRuta);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [km_salida]
+ *             required: [km_salida, nivel_tanque_salida]
  *             properties:
  *               km_salida: { type: number }
- *               galones_combustible: { type: number, nullable: true }
+ *               nivel_tanque_salida: { type: integer, minimum: 0, maximum: 8, description: 'Octavos de tanque (0 vacio, 8 lleno)' }
  *     responses:
  *       200:
  *         description: Salida registrada
@@ -149,7 +180,8 @@ router.put('/:id/entregas', routeController.confirmarEntregas);
  * @swagger
  * /api/rutas/{id}/cerrar:
  *   put:
- *     summary: Cierra una ruta (km de llegada)
+ *     summary: Cierra una ruta (km de llegada, nivel del tanque y facturas de combustible)
+ *     description: Calcula el consumo de la ruta y devuelve en alertas_combustible los avisos si el combustible no cuadra.
  *     tags: [Rutas]
  *     parameters:
  *       - in: path
@@ -162,9 +194,20 @@ router.put('/:id/entregas', routeController.confirmarEntregas);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [km_llegada]
+ *             required: [km_llegada, nivel_tanque_llegada]
  *             properties:
  *               km_llegada: { type: number }
+ *               nivel_tanque_llegada: { type: integer, minimum: 0, maximum: 8, description: 'Octavos de tanque (0 vacio, 8 lleno)' }
+ *               cargas:
+ *                 type: array
+ *                 description: Facturas de combustible cargado durante la ruta (opcional)
+ *                 items:
+ *                   type: object
+ *                   required: [numero_factura, galones, monto]
+ *                   properties:
+ *                     numero_factura: { type: string, maxLength: 40 }
+ *                     galones: { type: number, exclusiveMinimum: 0 }
+ *                     monto: { type: number, exclusiveMinimum: 0 }
  *     responses:
  *       200:
  *         description: Ruta cerrada

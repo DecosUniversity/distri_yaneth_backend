@@ -32,6 +32,7 @@ const ORDERS_TABLE = process.env.DB_ORDERS_TABLE || 'pedidos';
 const ORDER_DETAIL_TABLE = process.env.DB_ORDER_DETAIL_TABLE || 'pedido_detalle';
 const ROUTES_TABLE = process.env.DB_ROUTES_TABLE || 'rutas_entrega';
 const ROUTE_ORDERS_TABLE = process.env.DB_ROUTE_ORDERS_TABLE || 'ruta_pedidos';
+const FUEL_LOADS_TABLE = process.env.DB_FUEL_LOADS_TABLE || 'cargas_combustible';
 const ORDER_RETURNS_TABLE = process.env.DB_ORDER_RETURNS_TABLE || 'devoluciones_pedido';
 const ACTIVE_STATE = 'Activo';
 const INACTIVE_STATE = 'Inactivo';
@@ -105,6 +106,7 @@ module.exports = {
   ORDER_DETAIL_TABLE,
   ROUTES_TABLE,
   ROUTE_ORDERS_TABLE,
+  FUEL_LOADS_TABLE,
   ORDER_RETURNS_TABLE,
   ACTIVE_STATE,
   INACTIVE_STATE,

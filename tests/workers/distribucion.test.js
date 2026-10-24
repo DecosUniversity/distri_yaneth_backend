@@ -337,7 +337,7 @@ describe('flujo completo de ruta: salida, entregas y cierre', () => {
     await routeHandlers['routes.registrarSalida']({
       id: route.id_ruta,
       km_salida: 1000,
-      galones_combustible: 10,
+      nivel_tanque_salida: 8,
       id_usuario_modificacion: baseline.idUsuario,
     });
 
@@ -353,6 +353,7 @@ describe('flujo completo de ruta: salida, entregas y cierre', () => {
     await routeHandlers['routes.cerrar']({
       id: route.id_ruta,
       km_llegada: 1050,
+      nivel_tanque_llegada: 6,
       id_usuario_modificacion: baseline.idUsuario,
     });
 
@@ -699,6 +700,7 @@ describe('orders.reportPedidosDelDia', () => {
     await routeHandlers['routes.cerrar']({
       id: route.id_ruta,
       km_llegada: 30,
+      nivel_tanque_llegada: 6,
       id_usuario_modificacion: baseline.idUsuario,
     });
 

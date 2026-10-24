@@ -9,6 +9,7 @@ const ADMIN_TEST_PASSWORD_HASH = bcrypt.hashSync('x', 10);
 // evita tener que resolver el orden de dependencias a mano.
 const ALL_TABLES = [
   'auditoria_cambios',
+  'cargas_combustible',
   'cat_cuartos_frio',
   'cat_tipos_etapa',
   'cat_tipos_merma',

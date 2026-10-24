@@ -64,12 +64,12 @@ const validateOrderPayload = async (payload) => {
     return 'El cliente no existe';
   }
 
-  if (
-    payload.fecha_entrega_programada !== undefined &&
-    payload.fecha_entrega_programada !== null &&
-    payload.fecha_entrega_programada !== '' &&
-    !DATE_PATTERN.test(payload.fecha_entrega_programada)
-  ) {
+  // Obligatoria: con ella se mide la puntualidad de las entregas.
+  if (!payload.fecha_entrega_programada) {
+    return 'fecha_entrega_programada es obligatoria';
+  }
+
+  if (!DATE_PATTERN.test(payload.fecha_entrega_programada)) {
     return 'fecha_entrega_programada debe tener formato YYYY-MM-DD';
   }
 
@@ -232,7 +232,7 @@ const createPedido = async (req, res, next) => {
     const newOrder = await orderModel.create({
       id_cliente: Number.parseInt(req.body.id_cliente, 10),
       observaciones: req.body.observaciones,
-      fecha_entrega_programada: req.body.fecha_entrega_programada || null,
+      fecha_entrega_programada: req.body.fecha_entrega_programada,
       id_usuario_creacion: idUsuarioCreacion,
       lineas: req.body.lineas.map((linea) => ({
         id_producto: Number.parseInt(linea.id_producto, 10),
@@ -280,13 +280,17 @@ const updateFechaEntregaProgramada = async (req, res, next) => {
 
     const { fecha_entrega_programada } = req.body;
 
-    if (fecha_entrega_programada && !DATE_PATTERN.test(fecha_entrega_programada)) {
+    if (!fecha_entrega_programada) {
+      return res.status(400).json({ message: 'fecha_entrega_programada es obligatoria' });
+    }
+
+    if (!DATE_PATTERN.test(fecha_entrega_programada)) {
       return res.status(400).json({ message: 'fecha_entrega_programada debe tener formato YYYY-MM-DD' });
     }
 
     const updated = await orderModel.updateFechaEntregaProgramada(
       id,
-      fecha_entrega_programada || null,
+      fecha_entrega_programada,
       req.auth?.sub ?? null
     );
 

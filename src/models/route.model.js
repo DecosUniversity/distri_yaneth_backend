@@ -28,7 +28,12 @@ const cerrar = async (id, payload) => {
   return enqueueDbJob('routes.cerrar', { id, ...payload });
 };
 
+const indicadores = async (filters) => {
+  return enqueueDbJob('routes.indicadores', filters);
+};
+
 module.exports = {
+  indicadores,
   findAll,
   findById,
   pilotosDisponibles,

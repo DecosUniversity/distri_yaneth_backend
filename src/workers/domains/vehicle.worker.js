@@ -9,8 +9,8 @@ const {
 const { AUDIT_ACTION_CREATE, AUDIT_ACTION_UPDATE, AUDIT_ACTION_DELETE, recordAudit } = require('../shared/audit');
 
 const vehicleQueries = {
-  findAll: `SELECT v.id_vehiculo, v.placa, v.modelo, v.estado, v.kilometraje_actual, v.estado_registro, v.fecha_modificacion, v.id_usuario_modificacion, u.nombre_completo AS usuario_modificacion_nombre FROM ${VEHICLES_TABLE} v LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = v.id_usuario_modificacion WHERE v.estado_registro = '${ACTIVE_STATE}'`,
-  findById: `SELECT v.id_vehiculo, v.placa, v.modelo, v.estado, v.kilometraje_actual, v.estado_registro, v.fecha_modificacion, v.id_usuario_modificacion, u.nombre_completo AS usuario_modificacion_nombre FROM ${VEHICLES_TABLE} v LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = v.id_usuario_modificacion WHERE v.id_vehiculo = ? AND v.estado_registro = '${ACTIVE_STATE}'`,
+  findAll: `SELECT v.id_vehiculo, v.placa, v.modelo, v.estado, v.kilometraje_actual, v.capacidad_tanque_galones, v.estado_registro, v.fecha_modificacion, v.id_usuario_modificacion, u.nombre_completo AS usuario_modificacion_nombre FROM ${VEHICLES_TABLE} v LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = v.id_usuario_modificacion WHERE v.estado_registro = '${ACTIVE_STATE}'`,
+  findById: `SELECT v.id_vehiculo, v.placa, v.modelo, v.estado, v.kilometraje_actual, v.capacidad_tanque_galones, v.estado_registro, v.fecha_modificacion, v.id_usuario_modificacion, u.nombre_completo AS usuario_modificacion_nombre FROM ${VEHICLES_TABLE} v LEFT JOIN ${USERS_TABLE} u ON u.id_usuario = v.id_usuario_modificacion WHERE v.id_vehiculo = ? AND v.estado_registro = '${ACTIVE_STATE}'`,
 };
 
 const handlers = {
@@ -22,10 +22,26 @@ const handlers = {
     const [rows] = await pool.query(vehicleQueries.findById, [id]);
     return rows[0] || null;
   },
-  'vehicles.create': async ({ placa, modelo, estado, kilometraje_actual, estado_registro, id_usuario_modificacion }) => {
+  'vehicles.create': async ({
+    placa,
+    modelo,
+    estado,
+    kilometraje_actual,
+    capacidad_tanque_galones,
+    estado_registro,
+    id_usuario_modificacion,
+  }) => {
     const [result] = await pool.query(
-      `INSERT INTO ${VEHICLES_TABLE} (placa, modelo, estado, kilometraje_actual, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?)`,
-      [placa, modelo ?? null, estado ?? 'Disponible', kilometraje_actual ?? 0, estado_registro || ACTIVE_STATE, id_usuario_modificacion ?? null]
+      `INSERT INTO ${VEHICLES_TABLE} (placa, modelo, estado, kilometraje_actual, capacidad_tanque_galones, estado_registro, id_usuario_modificacion) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        placa,
+        modelo ?? null,
+        estado ?? 'Disponible',
+        kilometraje_actual ?? 0,
+        capacidad_tanque_galones ?? null,
+        estado_registro || ACTIVE_STATE,
+        id_usuario_modificacion ?? null,
+      ]
     );
 
     const [rows] = await pool.query(vehicleQueries.findById, [result.insertId]);
@@ -48,6 +64,7 @@ const handlers = {
     modelo,
     estado,
     kilometraje_actual,
+    capacidad_tanque_galones,
     estado_registro,
     id_usuario_modificador,
   }) => {
@@ -57,7 +74,7 @@ const handlers = {
       await connection.beginTransaction();
 
       const [existingRows] = await connection.query(
-        `SELECT id_vehiculo, kilometraje_actual FROM ${VEHICLES_TABLE} WHERE id_vehiculo = ? AND estado_registro = '${ACTIVE_STATE}'`,
+        `SELECT id_vehiculo, kilometraje_actual, capacidad_tanque_galones FROM ${VEHICLES_TABLE} WHERE id_vehiculo = ? AND estado_registro = '${ACTIVE_STATE}'`,
         [id]
       );
 
@@ -73,10 +90,13 @@ const handlers = {
         kilometraje_actual === undefined || kilometraje_actual === null || kilometraje_actual === ''
           ? previousMileage
           : Number(kilometraje_actual);
+      // Si no se envia la capacidad del tanque, se conserva la registrada.
+      const nextCapacity =
+        capacidad_tanque_galones === undefined ? currentVehicle.capacidad_tanque_galones : capacidad_tanque_galones;
 
       const [result] = await connection.query(
-        `UPDATE ${VEHICLES_TABLE} SET placa = ?, modelo = ?, estado = ?, kilometraje_actual = ?, estado_registro = COALESCE(?, estado_registro), id_usuario_modificacion = ? WHERE id_vehiculo = ? AND estado_registro = '${ACTIVE_STATE}'`,
-        [placa, modelo ?? null, estado ?? 'Disponible', nextMileage, estado_registro ?? null, id_usuario_modificador ?? null, id]
+        `UPDATE ${VEHICLES_TABLE} SET placa = ?, modelo = ?, estado = ?, kilometraje_actual = ?, capacidad_tanque_galones = ?, estado_registro = COALESCE(?, estado_registro), id_usuario_modificacion = ? WHERE id_vehiculo = ? AND estado_registro = '${ACTIVE_STATE}'`,
+        [placa, modelo ?? null, estado ?? 'Disponible', nextMileage, nextCapacity ?? null, estado_registro ?? null, id_usuario_modificador ?? null, id]
       );
 
       if (result.affectedRows === 0) {

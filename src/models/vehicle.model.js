@@ -8,12 +8,21 @@ const findById = async (id) => {
   return enqueueDbJob('vehicles.findById', { id });
 };
 
-const create = async ({ placa, modelo, estado, kilometraje_actual, estado_registro, id_usuario_modificacion }) => {
+const create = async ({
+  placa,
+  modelo,
+  estado,
+  kilometraje_actual,
+  capacidad_tanque_galones,
+  estado_registro,
+  id_usuario_modificacion,
+}) => {
   return enqueueDbJob('vehicles.create', {
     placa,
     modelo,
     estado,
     kilometraje_actual,
+    capacidad_tanque_galones,
     estado_registro,
     id_usuario_modificacion,
   });
@@ -21,7 +30,7 @@ const create = async ({ placa, modelo, estado, kilometraje_actual, estado_regist
 
 const update = async (
   id,
-  { placa, modelo, estado, kilometraje_actual, estado_registro, id_usuario_modificador }
+  { placa, modelo, estado, kilometraje_actual, capacidad_tanque_galones, estado_registro, id_usuario_modificador }
 ) => {
   return enqueueDbJob('vehicles.update', {
     id,
@@ -29,6 +38,7 @@ const update = async (
     modelo,
     estado,
     kilometraje_actual,
+    capacidad_tanque_galones,
     estado_registro,
     id_usuario_modificador,
   });

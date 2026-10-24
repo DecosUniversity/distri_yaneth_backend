@@ -27,6 +27,27 @@ CREATE TABLE `auditoria_cambios` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
+-- Tabla: cargas_combustible
+-- ----------------------------
+DROP TABLE IF EXISTS `cargas_combustible`;
+CREATE TABLE `cargas_combustible` (
+  `id_carga` int(11) NOT NULL AUTO_INCREMENT,
+  `id_ruta` int(11) NOT NULL,
+  `numero_factura` varchar(40) NOT NULL,
+  `galones` decimal(8,2) NOT NULL,
+  `monto` decimal(10,2) NOT NULL,
+  `id_usuario_registro` int(11) DEFAULT NULL,
+  `estado_registro` enum('Activo','Inactivo') NOT NULL DEFAULT 'Activo',
+  `fecha_creacion` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id_carga`),
+  KEY `fk_cargas_combustible_ruta` (`id_ruta`),
+  KEY `fk_cargas_combustible_usuario` (`id_usuario_registro`),
+  KEY `idx_cargas_combustible_factura` (`numero_factura`),
+  CONSTRAINT `fk_cargas_combustible_ruta` FOREIGN KEY (`id_ruta`) REFERENCES `rutas_entrega` (`id_ruta`),
+  CONSTRAINT `fk_cargas_combustible_usuario` FOREIGN KEY (`id_usuario_registro`) REFERENCES `usuarios` (`id_usuario`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ----------------------------
 -- Tabla: cat_cuartos_frio
 -- ----------------------------
 DROP TABLE IF EXISTS `cat_cuartos_frio`;
@@ -647,6 +668,9 @@ CREATE TABLE `rutas_entrega` (
   `km_salida` decimal(12,2) DEFAULT NULL,
   `km_llegada` decimal(12,2) DEFAULT NULL,
   `galones_combustible` decimal(10,2) DEFAULT NULL,
+  `nivel_tanque_salida` tinyint(4) DEFAULT NULL,
+  `nivel_tanque_llegada` tinyint(4) DEFAULT NULL,
+  `alertas_combustible` text DEFAULT NULL,
   `fecha_salida` datetime DEFAULT NULL,
   `fecha_llegada` datetime DEFAULT NULL,
   `id_usuario_creacion` int(11) NOT NULL,
@@ -777,6 +801,7 @@ CREATE TABLE `vehiculos` (
   `modelo` varchar(50) DEFAULT NULL,
   `estado` enum('Disponible','En Ruta','Mantenimiento') DEFAULT 'Disponible',
   `kilometraje_actual` decimal(10,2) DEFAULT 0.00,
+  `capacidad_tanque_galones` decimal(6,2) DEFAULT NULL,
   `estado_registro` enum('Activo','Inactivo') NOT NULL DEFAULT 'Activo',
   `fecha_modificacion` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `id_usuario_modificacion` int(11) DEFAULT NULL,

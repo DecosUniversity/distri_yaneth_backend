@@ -44,12 +44,12 @@ const createActiveGreenSublot = async ({ idProducto, idProveedor, pesoKg = 100 }
 let vehicleFixtureCounter = 0;
 let pilotFixtureCounter = 0;
 
-const createVehicle = async ({ placa, kilometrajeActual = 1000 } = {}) => {
+const createVehicle = async ({ placa, kilometrajeActual = 1000, capacidadTanque = 16 } = {}) => {
   vehicleFixtureCounter += 1;
   const [result] = await pool.query(
-    `INSERT INTO vehiculos (placa, modelo, estado, kilometraje_actual, estado_registro)
-     VALUES (?, 'Modelo de pruebas', 'Disponible', ?, 'Activo')`,
-    [placa || `TST-${vehicleFixtureCounter}`, kilometrajeActual]
+    `INSERT INTO vehiculos (placa, modelo, estado, kilometraje_actual, capacidad_tanque_galones, estado_registro)
+     VALUES (?, 'Modelo de pruebas', 'Disponible', ?, ?, 'Activo')`,
+    [placa || `TST-${vehicleFixtureCounter}`, kilometrajeActual, capacidadTanque]
   );
   return result.insertId;
 };

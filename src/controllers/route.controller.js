@@ -15,11 +15,48 @@ const BUSINESS_RULE_MESSAGES = [
   'La linea de pedido no pertenece a esta ruta',
   'La ruta debe estar En Ruta para cerrarla',
   'km_llegada debe ser mayor a km_salida',
+  'Los galones de una factura no pueden superar la capacidad del tanque del vehiculo',
 ];
 
 const LOCKED_LINE_MESSAGE = 'La linea ya fue procesada; solo un administrador puede modificarla';
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const TANK_EIGHTHS = 8;
+const MAX_FUEL_LOADS = 10;
 
 const parseId = (value) => Number.parseInt(value, 10);
+
+// Nivel del tanque en octavos: entero de 0 (vacio) a 8 (lleno).
+const parseTankLevel = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  const level = Number(value);
+  return Number.isInteger(level) && level >= 0 && level <= TANK_EIGHTHS ? level : null;
+};
+
+const validateFuelLoads = (cargas) => {
+  if (cargas === undefined || cargas === null) return null;
+
+  if (!Array.isArray(cargas)) return 'cargas debe ser una lista de facturas de combustible';
+
+  if (cargas.length > MAX_FUEL_LOADS) return `No se pueden registrar mas de ${MAX_FUEL_LOADS} facturas por ruta`;
+
+  for (const carga of cargas) {
+    const factura = String(carga?.numero_factura ?? '').trim();
+
+    if (!factura || factura.length > 40) {
+      return 'Cada factura debe tener un numero_factura de hasta 40 caracteres';
+    }
+
+    if (!(Number(carga.galones) > 0)) {
+      return 'Los galones de cada factura deben ser mayores a 0';
+    }
+
+    if (!(Number(carga.monto) > 0)) {
+      return 'El monto de cada factura debe ser mayor a 0';
+    }
+  }
+
+  return null;
+};
 
 const handleRouteError = (error, res, next) => {
   if (error.message === LOCKED_LINE_MESSAGE) {
@@ -159,15 +196,15 @@ const registrarSalida = async (req, res, next) => {
       return res.status(400).json({ message: 'km_salida es obligatorio y debe ser numerico' });
     }
 
-    const galones = req.body.galones_combustible;
+    const nivelTanque = parseTankLevel(req.body.nivel_tanque_salida);
 
-    if (galones !== undefined && galones !== null && galones !== '' && (Number.isNaN(Number(galones)) || Number(galones) < 0)) {
-      return res.status(400).json({ message: 'galones_combustible debe ser numerico y mayor o igual a 0' });
+    if (nivelTanque === null) {
+      return res.status(400).json({ message: 'nivel_tanque_salida es obligatorio y debe ser un octavo de tanque entre 0 y 8' });
     }
 
     const updated = await routeModel.registrarSalida(id, {
       km_salida: kmSalida,
-      galones_combustible: galones,
+      nivel_tanque_salida: nivelTanque,
       id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
@@ -250,8 +287,26 @@ const cerrarRuta = async (req, res, next) => {
       return res.status(400).json({ message: 'km_llegada es obligatorio y debe ser numerico' });
     }
 
+    const nivelTanque = parseTankLevel(req.body.nivel_tanque_llegada);
+
+    if (nivelTanque === null) {
+      return res.status(400).json({ message: 'nivel_tanque_llegada es obligatorio y debe ser un octavo de tanque entre 0 y 8' });
+    }
+
+    const fuelLoadsError = validateFuelLoads(req.body.cargas);
+
+    if (fuelLoadsError) {
+      return res.status(400).json({ message: fuelLoadsError });
+    }
+
     const updated = await routeModel.cerrar(id, {
       km_llegada: kmLlegada,
+      nivel_tanque_llegada: nivelTanque,
+      cargas: (req.body.cargas || []).map((carga) => ({
+        numero_factura: String(carga.numero_factura).trim(),
+        galones: Number(carga.galones),
+        monto: Number(carga.monto),
+      })),
       id_usuario_modificacion: req.auth?.sub ?? null,
     });
 
@@ -261,7 +316,46 @@ const cerrarRuta = async (req, res, next) => {
   }
 };
 
+const getIndicadores = async (req, res, next) => {
+  try {
+    if (req.auth?.rol === PILOT_ROLE) {
+      return res.status(403).json({ message: 'Solo Administrador o Logistica pueden ver los indicadores' });
+    }
+
+    const { desde, hasta, id_vehiculo } = req.query;
+
+    if (desde && !DATE_PATTERN.test(desde)) {
+      return res.status(400).json({ message: 'desde debe tener formato YYYY-MM-DD' });
+    }
+
+    if (hasta && !DATE_PATTERN.test(hasta)) {
+      return res.status(400).json({ message: 'hasta debe tener formato YYYY-MM-DD' });
+    }
+
+    if (desde && hasta && desde > hasta) {
+      return res.status(400).json({ message: 'La fecha "desde" no puede ser posterior a "hasta"' });
+    }
+
+    const idVehiculo = id_vehiculo ? parseId(id_vehiculo) : null;
+
+    if (id_vehiculo && (Number.isNaN(idVehiculo) || idVehiculo <= 0)) {
+      return res.status(400).json({ message: 'id_vehiculo debe ser valido' });
+    }
+
+    const indicadores = await routeModel.indicadores({
+      desde: desde || null,
+      hasta: hasta || null,
+      id_vehiculo: idVehiculo,
+    });
+
+    return res.status(200).json(indicadores);
+  } catch (error) {
+    return next(error);
+  }
+};
+
 module.exports = {
+  getIndicadores,
   getPilotosDisponibles,
   getRutas,
   getRutaById,
